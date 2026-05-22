@@ -3,26 +3,70 @@ const path = require('path');
 const { Pool } = require('pg');
 const initSqlJs = require('sql.js');
 
-// 1. Read environment variables from .env.local
+// 1. Read environment variables from .env.local and load them into process.env if present
 const envPath = path.join(__dirname, '..', '.env.local');
-let databaseUrl = 'postgresql://postgres:postgres@localhost:5432/cutchulo?sslmode=disable';
-
 if (fs.existsSync(envPath)) {
   const envContent = fs.readFileSync(envPath, 'utf8');
-  const match = envContent.match(/^DATABASE_URL=(.+)$/m);
-  if (match) {
-    databaseUrl = match[1].trim().replace(/^['"]|['"]$/g, ''); // strip optional quotes
+  const lines = envContent.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const parts = trimmed.split('=');
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        const value = parts.slice(1).join('=').trim().replace(/^['"]|['"]$/g, '');
+        if (!process.env[key]) {
+          process.env[key] = value;
+        }
+      }
+    }
   }
 }
 
-console.log('Database URL target:', databaseUrl);
+// 2. Build the database connection pool using robust logic
+function getPoolConfig() {
+  const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
+  
+  if (connectionString) {
+    console.log('Utilizando Connection String para migração.');
+    return {
+      connectionString,
+      ssl: connectionString.includes('sslmode=require') || connectionString.includes('neon') || (process.env.PGHOST && process.env.PGHOST.includes('neon'))
+        ? { rejectUnauthorized: false }
+        : undefined,
+    };
+  }
+  
+  console.log('Utilizando variáveis individuais PG/POSTGRES para migração.');
+  const host = process.env.PGHOST || process.env.POSTGRES_HOST;
+  const user = process.env.PGUSER || process.env.POSTGRES_USER;
+  const password = process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD;
+  const database = process.env.PGDATABASE || process.env.POSTGRES_DB;
+  const port = parseInt(process.env.PGPORT || process.env.POSTGRES_PORT || '5432', 10);
+  
+  const isNeon = host && host.includes('neon.tech');
+  
+  return {
+    host,
+    user,
+    password,
+    database,
+    port,
+    ssl: isNeon || process.env.SSL_CERT_DAYS
+      ? { rejectUnauthorized: false }
+      : undefined,
+  };
+}
 
-const pool = new Pool({
-  connectionString: databaseUrl,
-  ssl: databaseUrl.includes('sslmode=require') || databaseUrl.includes('neon')
-    ? { rejectUnauthorized: false }
-    : undefined,
+const poolConfig = getPoolConfig();
+console.log('Configurações de Banco Carregadas:', {
+  host: poolConfig.host || 'Usando Connection String',
+  user: poolConfig.user || 'Usando Connection String',
+  database: poolConfig.database || 'Usando Connection String',
+  ssl: poolConfig.ssl ? 'Habilitado (SSL)' : 'Desabilitado'
 });
+
+const pool = new Pool(poolConfig);
 
 const SQLITE_DB_PATH = path.join(__dirname, '..', 'data', 'cthulhu.db');
 

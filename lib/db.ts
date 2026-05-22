@@ -2,23 +2,46 @@ import { Pool } from 'pg';
 
 let pool: Pool;
 
-const connectionString = process.env.DATABASE_URL;
-
-if (process.env.NODE_ENV === 'production') {
-  pool = new Pool({
-    connectionString,
-    ssl: connectionString?.includes('sslmode=require') || connectionString?.includes('neon')
-      ? { rejectUnauthorized: false }
-      : undefined,
-  });
-} else {
-  if (!(global as any).pgPool) {
-    (global as any).pgPool = new Pool({
+function getPoolConfig() {
+  const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
+  
+  if (connectionString) {
+    return {
       connectionString,
-      ssl: connectionString?.includes('sslmode=require') || connectionString?.includes('neon')
+      ssl: connectionString.includes('sslmode=require') || connectionString.includes('neon') || process.env.PGHOST?.includes('neon')
         ? { rejectUnauthorized: false }
         : undefined,
-    });
+    };
+  }
+  
+  // Support individual environment variables
+  const host = process.env.PGHOST || process.env.POSTGRES_HOST;
+  const user = process.env.PGUSER || process.env.POSTGRES_USER;
+  const password = process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD;
+  const database = process.env.PGDATABASE || process.env.POSTGRES_DB;
+  const port = parseInt(process.env.PGPORT || process.env.POSTGRES_PORT || '5432', 10);
+  
+  const isNeon = host?.includes('neon.tech');
+  
+  return {
+    host,
+    user,
+    password,
+    database,
+    port,
+    ssl: isNeon || process.env.SSL_CERT_DAYS
+      ? { rejectUnauthorized: false }
+      : undefined,
+  };
+}
+
+const poolConfig = getPoolConfig();
+
+if (process.env.NODE_ENV === 'production') {
+  pool = new Pool(poolConfig);
+} else {
+  if (!(global as any).pgPool) {
+    (global as any).pgPool = new Pool(poolConfig);
   }
   pool = (global as any).pgPool;
 }
