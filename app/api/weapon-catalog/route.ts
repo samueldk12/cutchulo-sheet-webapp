@@ -1,17 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
-// GET /api/weapon-catalog - Retrieve weapon catalog (custom user items + default catalog items)
+// Cache the default weapons from the JSON file in memory
+let cachedDefaultWeapons: any[] | null = null;
+
+function loadDefaultWeapons(): any[] {
+  if (cachedDefaultWeapons) return cachedDefaultWeapons;
+
+  try {
+    const filePath = join(process.cwd(), 'public', 'assets', 'weapons.json');
+    const raw = readFileSync(filePath, 'utf-8');
+    cachedDefaultWeapons = JSON.parse(raw);
+    return cachedDefaultWeapons!;
+  } catch (err) {
+    console.error('Erro ao carregar catálogo padrão de armas:', err);
+    return [];
+  }
+}
+
+// GET /api/weapon-catalog - Retrieve weapon catalog (static JSON defaults + custom user DB items)
 export async function GET(request: NextRequest) {
   try {
     const userId = parseInt(request.headers.get('x-user-id')!, 10);
-    const result = await query(
-      `SELECT * FROM weapon_catalog 
-       WHERE user_id = $1 OR user_id IS NULL 
-       ORDER BY category, name`,
+
+    // 1. Load default weapons from public/assets/weapons.json
+    const defaultWeapons = loadDefaultWeapons();
+
+    // 2. Load custom user weapons from the database
+    const userResult = await query(
+      `SELECT * FROM weapon_catalog WHERE user_id = $1 ORDER BY category, name`,
       [userId]
     );
-    return NextResponse.json(result.rows);
+
+    // 3. Merge: defaults first, then user custom entries
+    const combined = [
+      ...defaultWeapons,
+      ...userResult.rows,
+    ];
+
+    // Sort by category then name
+    combined.sort((a, b) => {
+      const catCompare = (a.category || '').localeCompare(b.category || '');
+      if (catCompare !== 0) return catCompare;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    return NextResponse.json(combined);
   } catch (e: any) {
     console.error('List weapon catalog error:', e);
     return NextResponse.json({ error: e.message }, { status: 500 });

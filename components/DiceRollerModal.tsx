@@ -8,6 +8,7 @@ interface DiceRollerModalProps {
   characterId?: number | null;
   targetName?: string;
   targetValue?: number;
+  defaultDiceType?: 'd100' | 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'custom';
   onRollComplete?: (roll: { expression: string; result: number; details: string }) => void;
 }
 
@@ -17,6 +18,7 @@ export default function DiceRollerModal({
   characterId = null,
   targetName = '',
   targetValue = 0,
+  defaultDiceType,
   onRollComplete
 }: DiceRollerModalProps) {
   const [diceType, setDiceType] = useState<'d100' | 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'custom'>('d100');
@@ -36,11 +38,13 @@ export default function DiceRollerModal({
       setRollDetails('');
       setManualTarget(targetValue > 0 ? String(targetValue) : '');
       setManualTargetName(targetName || '');
-      if (targetValue > 0) {
+      if (defaultDiceType) {
+        setDiceType(defaultDiceType);
+      } else if (targetValue > 0) {
         setDiceType('d100');
       }
     }
-  }, [isOpen, targetValue, targetName]);
+  }, [isOpen, targetValue, targetName, defaultDiceType]);
 
   if (!isOpen) return null;
 

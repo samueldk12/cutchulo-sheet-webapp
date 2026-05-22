@@ -11,6 +11,100 @@ import NpcsEvidenceCampaigns from '../components/NpcsEvidenceCampaigns';
 import DiceRollerModal from '../components/DiceRollerModal';
 import Link from 'next/link';
 
+const LOCAL_DEFAULT_SKILLS = [
+  { name: 'Accounting (Contabilidade)', base: 5 },
+  { name: 'Anthropology (Antropologia)', base: 1 },
+  { name: 'Appraise (Avaliar)', base: 5 },
+  { name: 'Archaeology (Arqueologia)', base: 1 },
+  { name: 'Art/Craft (Arte/Artesanato)', base: 5 },
+  { name: 'Charm (Charme)', base: 15 },
+  { name: 'Climb (Escalar)', base: 20 },
+  { name: 'Computer Use (Computador)', base: 5 },
+  { name: 'Credit Rating (Crédito)', base: 0 },
+  { name: 'Cthulhu Mythos (Mitos de Cthulhu)', base: 0 },
+  { name: 'Demolitions (Demolições)', base: 1 },
+  { name: 'Disguise (Disfarce)', base: 5 },
+  { name: 'Diving (Mergulho)', base: 1 },
+  { name: 'Dodge (Esquivar)', base: 0 },
+  { name: 'Drive Auto (Dirigir)', base: 20 },
+  { name: 'Elec. Repair (Rep. Elétrica)', base: 10 },
+  { name: 'Electronics (Eletrônica)', base: 1 },
+  { name: 'Fast Talk (Conversa Fiada)', base: 5 },
+  { name: 'Fighting (Brawl) (Luta)', base: 25 },
+  { name: 'Firearms (Handgun) (Pistola)', base: 20 },
+  { name: 'Firearms (Rifle/Shotgun) (Rifle)', base: 25 },
+  { name: 'Firearms (Submachine Gun) (Submetralhadora)', base: 15 },
+  { name: 'First Aid (Primeiros Socorros)', base: 30 },
+  { name: 'History (História)', base: 5 },
+  { name: 'Intimidate (Intimidar)', base: 15 },
+  { name: 'Jump (Saltar)', base: 20 },
+  { name: 'Language (Other) (Idioma - Outro)', base: 1 },
+  { name: 'Language (Own) (Idioma - Próprio)', base: 0 },
+  { name: 'Law (Direito)', base: 5 },
+  { name: 'Library Use (Pesquisa em Biblioteca)', base: 20 },
+  { name: 'Listen (Ouvir)', base: 20 },
+  { name: 'Locksmith (Ladrão de Cofres)', base: 1 },
+  { name: 'Mech. Repair (Rep. Mecânica)', base: 10 },
+  { name: 'Medicine (Medicina)', base: 1 },
+  { name: 'Natural World (Mundo Natural)', base: 10 },
+  { name: 'Navigate (Navegação)', base: 10 },
+  { name: 'Occult (Ocultismo)', base: 5 },
+  { name: 'Op. Heavy Machinery (Op. Máq. Pesada)', base: 1 },
+  { name: 'Persuade (Persuadir)', base: 10 },
+  { name: 'Photography (Fotografia)', base: 1 },
+  { name: 'Pilot (Pilotagem)', base: 1 },
+  { name: 'Psychology (Psicologia)', base: 10 },
+  { name: 'Psychoanalysis (Psicanálise)', base: 1 },
+  { name: 'Read Lips (Leitura Labial)', base: 1 },
+  { name: 'Ride (Equitação)', base: 5 },
+  { name: 'Science (Biology) (Biologia)', base: 1 },
+  { name: 'Science (Botany) (Botânica)', base: 1 },
+  { name: 'Science (Chemistry) (Química)', base: 1 },
+  { name: 'Science (Cryptography) (Criptografia)', base: 1 },
+  { name: 'Science (Engineering) (Engenharia)', base: 1 },
+  { name: 'Science (Forensics) (Forense)', base: 1 },
+  { name: 'Science (Geology) (Geologia)', base: 1 },
+  { name: 'Science (Mathematics) (Matemática)', base: 1 },
+  { name: 'Science (Meteorology) (Meteorologia)', base: 1 },
+  { name: 'Science (Pharmacy) (Farmácia)', base: 1 },
+  { name: 'Science (Physics) (Física)', base: 1 },
+  { name: 'Science (Zoology) (Zoologia)', base: 1 },
+  { name: 'Sleight of Hand (Prestidigitação)', base: 10 },
+  { name: 'Spot Hidden (Detectar)', base: 25 },
+  { name: 'Stealth (Furtividade)', base: 20 },
+  { name: 'Survival (Sobrevivência)', base: 10 },
+  { name: 'Swim (Nadar)', base: 20 },
+  { name: 'Throw (Arremesso)', base: 20 },
+  { name: 'Track (Rastrear)', base: 10 },
+];
+
+function getLocalDefaultSkills(dex: number, edu: number) {
+  return LOCAL_DEFAULT_SKILLS.map((skill, idx) => {
+    let base = skill.base;
+    if (skill.name.includes('Dodge')) base = Math.floor(dex / 2);
+    if (skill.name.includes('Language (Own)')) base = edu;
+    const isOcc = skill.name.includes('Credit Rating') ? 1 : 0;
+    return {
+      id: idx + 1,
+      name: skill.name,
+      base_value: base,
+      value: base,
+      is_occupation: isOcc,
+      is_interest: 0,
+      occ_points: 0,
+      int_points: 0,
+      game_points: 0
+    };
+  });
+}
+
+function generateLocalUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
+
 export default function Dashboard() {
   const { user, logout, loading: authLoading } = useAuth();
   
@@ -27,11 +121,28 @@ export default function Dashboard() {
   const [rollTargetName, setRollTargetName] = useState('');
   const [rollTargetValue, setRollTargetValue] = useState(0);
 
+  // Quick Campaign Join State
+  const [quickJoinCode, setQuickJoinCode] = useState('');
+
   // Hidden file input for JSON import
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const isAnonymous = user?.id === -1;
+
   // Load characters and friends list
   const loadSidebarData = async () => {
+    if (isAnonymous) {
+      try {
+        const anonCharsStr = localStorage.getItem('cutchulo_anon_characters');
+        const anonChars = anonCharsStr ? JSON.parse(anonCharsStr) : [];
+        setCharacters(anonChars);
+        setFriends([]);
+      } catch (err) {
+        console.error('Erro ao carregar fichas anônimas:', err);
+      }
+      return;
+    }
+
     try {
       const res = await fetch('/api/characters');
       if (res.ok) {
@@ -62,6 +173,18 @@ export default function Dashboard() {
       return;
     }
 
+    if (isAnonymous) {
+      try {
+        const anonCharsStr = localStorage.getItem('cutchulo_anon_characters');
+        const anonChars = anonCharsStr ? JSON.parse(anonCharsStr) : [];
+        const found = anonChars.find((c: any) => c.id === selectedCharId);
+        setCharacter(found || null);
+      } catch (err) {
+        console.error(err);
+      }
+      return;
+    }
+
     const fetchSheet = async () => {
       setLoadingSheet(true);
       try {
@@ -80,11 +203,11 @@ export default function Dashboard() {
     };
 
     fetchSheet();
-  }, [selectedCharId]);
+  }, [selectedCharId, isAnonymous]);
 
   // Polling Hook for live updates - Typing-safe check
   useEffect(() => {
-    if (!selectedCharId) return;
+    if (isAnonymous || !selectedCharId) return;
 
     const interval = setInterval(() => {
       const activeEl = document.activeElement;
@@ -117,7 +240,7 @@ export default function Dashboard() {
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [selectedCharId]);
+  }, [selectedCharId, isAnonymous]);
 
   if (authLoading) {
     return (
@@ -133,6 +256,46 @@ export default function Dashboard() {
 
   // Actions: Character CRUD
   const handleCreateInvestigator = async () => {
+    if (isAnonymous) {
+      const newCharId = Date.now();
+      const dex = 50;
+      const edu = 50;
+      const newCharObj = {
+        id: newCharId,
+        uuid: generateLocalUUID(),
+        name: 'Novo Investigador Anônimo',
+        player: '',
+        occupation: '',
+        age: 25,
+        gender: '',
+        residence: '',
+        birthplace: '',
+        str: 50, dex, int_val: 50, con: 50, app: 50, pow: 50, siz: 50, edu, luck: 50,
+        hp_max: 10, hp_current: 10,
+        mp_max: 10, mp_current: 10,
+        san_max: 250, san_current: 250,
+        appearance_desc: '', ideology: '', significant_people: '', meaningful_locations: '',
+        treasured_possessions: '', traits: '', injuries_scars: '', phobias_manias: '',
+        arcane_tomes: '', backstory: '', notes: '', image: '', cash: '', assets: '', spending_level: '',
+        skills: getLocalDefaultSkills(dex, edu),
+        weapons: [],
+        possessions: [],
+        updated_at: new Date().toISOString()
+      };
+      try {
+        const anonCharsStr = localStorage.getItem('cutchulo_anon_characters');
+        const anonChars = anonCharsStr ? JSON.parse(anonCharsStr) : [];
+        anonChars.push(newCharObj);
+        localStorage.setItem('cutchulo_anon_characters', JSON.stringify(anonChars));
+        loadSidebarData();
+        setSelectedCharId(newCharId);
+        setActiveTab('general');
+      } catch (err) {
+        console.error(err);
+      }
+      return;
+    }
+
     try {
       const res = await fetch('/api/characters', {
         method: 'POST',
@@ -157,6 +320,20 @@ export default function Dashboard() {
     if (!character) return;
     if (!confirm(`Deseja mesmo sacrificar o investigador ${character.name} para o abismo?`)) return;
 
+    if (isAnonymous) {
+      try {
+        const anonCharsStr = localStorage.getItem('cutchulo_anon_characters');
+        const anonChars = anonCharsStr ? JSON.parse(anonCharsStr) : [];
+        const filtered = anonChars.filter((c: any) => c.id !== character.id);
+        localStorage.setItem('cutchulo_anon_characters', JSON.stringify(filtered));
+        setSelectedCharId(null);
+        loadSidebarData();
+      } catch (err) {
+        console.error(err);
+      }
+      return;
+    }
+
     try {
       const res = await fetch(`/api/characters/${character.id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -175,8 +352,20 @@ export default function Dashboard() {
     if (!character) return;
 
     // Snappy UI local update
-    const updated = { ...character, [field]: value };
+    const updated = { ...character, [field]: value, updated_at: new Date().toISOString() };
     setCharacter(updated);
+
+    if (isAnonymous) {
+      try {
+        const anonCharsStr = localStorage.getItem('cutchulo_anon_characters');
+        const anonChars = anonCharsStr ? JSON.parse(anonCharsStr) : [];
+        const updatedList = anonChars.map((c: any) => c.id === character.id ? updated : c);
+        localStorage.setItem('cutchulo_anon_characters', JSON.stringify(updatedList));
+      } catch (err) {
+        console.error(err);
+      }
+      return;
+    }
 
     try {
       await fetch(`/api/characters/${character.id}`, {
@@ -349,18 +538,39 @@ export default function Dashboard() {
   // JSON Import & Export Backup system
   const handleExportSheet = () => {
     if (!character) return;
-    fetch(`/api/export/${character.id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `ficha_${character.name.replace(/\s+/g, '_').toLowerCase()}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-      })
-      .catch((err) => console.error(err));
+    
+    if (isAnonymous) {
+      const exportData = {
+        version: 3,
+        exportedAt: new Date().toISOString(),
+        character: {
+          ...character,
+          skills: character.skills || [],
+          weapons: character.weapons || [],
+          possessions: character.possessions || []
+        }
+      };
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ficha_${character.name.replace(/\s+/g, '_').toLowerCase()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      fetch(`/api/export/${character.id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `ficha_${character.name.replace(/\s+/g, '_').toLowerCase()}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        })
+        .catch((err) => console.error(err));
+    }
   };
 
   const handleImportSheet = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -371,19 +581,80 @@ export default function Dashboard() {
     reader.onload = async (event) => {
       try {
         const json = JSON.parse(event.target?.result as string);
-        const res = await fetch('/api/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ character: json, isFriendExport: false })
-        });
-        if (res.ok) {
-          const newChar = await res.json();
-          alert('Grimório de Ficha importado com sucesso!');
-          loadSidebarData();
-          setSelectedCharId(newChar.id);
+
+        // Recursive helper to unpack character from any nested structure
+        const extractCharacter = (obj: any): any => {
+          if (!obj) return null;
+          if (obj.character && typeof obj.character === 'object') {
+            const inner = extractCharacter(obj.character);
+            if (inner && inner.name) return inner;
+          }
+          if (obj.name) return obj;
+          if (Array.isArray(obj)) {
+            for (const item of obj) {
+              const found = extractCharacter(item);
+              if (found) return found;
+            }
+          }
+          for (const key of Object.keys(obj)) {
+            if (obj[key] && typeof obj[key] === 'object') {
+              const found = extractCharacter(obj[key]);
+              if (found && found.name) return found;
+            }
+          }
+          return null;
+        };
+
+        const unpackedChar = extractCharacter(json);
+        if (!unpackedChar || !unpackedChar.name) {
+          alert('JSON inválido: campo "character" ou "name" obrigatório no arquivo JSON');
+          return;
+        }
+
+        if (isAnonymous) {
+          const anonCharsStr = localStorage.getItem('cutchulo_anon_characters');
+          const anonChars = anonCharsStr ? JSON.parse(anonCharsStr) : [];
+          
+          const newId = anonChars.length > 0 ? Math.max(...anonChars.map((c: any) => c.id)) + 1 : 1;
+          const newUuid = unpackedChar.uuid || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36));
+
+          const importedChar = {
+            ...unpackedChar,
+            id: newId,
+            uuid: newUuid,
+            skills: unpackedChar.skills || [],
+            weapons: unpackedChar.weapons || [],
+            possessions: unpackedChar.possessions || []
+          };
+
+          const existingIndex = anonChars.findIndex((c: any) => c.uuid === newUuid);
+          if (existingIndex > -1) {
+            anonChars[existingIndex] = importedChar;
+          } else {
+            anonChars.push(importedChar);
+          }
+
+          localStorage.setItem('cutchulo_anon_characters', JSON.stringify(anonChars));
+          alert('Grimório de Ficha importado com sucesso localmente!');
+          
+          setCharacters(anonChars);
+          setSelectedCharId(importedChar.id);
+          setCharacter(importedChar);
         } else {
-          const err = await res.json();
-          alert(`Erro na importação: ${err.error}`);
+          const res = await fetch('/api/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ character: json, isFriendExport: false })
+          });
+          if (res.ok) {
+            const newChar = await res.json();
+            alert('Grimório de Ficha importado com sucesso!');
+            loadSidebarData();
+            setSelectedCharId(newChar.id);
+          } else {
+            const err = await res.json();
+            alert(`Erro na importação: ${err.error}`);
+          }
         }
       } catch (err) {
         alert('Erro ao decodificar JSON.');
@@ -508,30 +779,133 @@ export default function Dashboard() {
           <>
             {/* Sheet Control Header */}
             <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <h1 style={{ fontSize: '1.6rem', color: 'var(--text-gold)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  {character.name}
-                  {character.is_friend === 1 && <span style={{ fontSize: '0.75rem', background: 'rgba(229,169,59,0.15)', color: 'var(--text-gold)', border: '1px solid var(--border-gold)', borderRadius: '4px', padding: '0.1rem 0.5rem' }}>Ficha Compartilhada (Lida Apenas)</span>}
-                </h1>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  {character.occupation || 'Nenhuma Ocupação'} | {character.age} Anos
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                {/* Character Avatar Thumbnail */}
+                <div style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '8px',
+                  border: '2px solid var(--border-gold)',
+                  background: character.image ? `url(${character.image}) center/cover no-repeat` : 'linear-gradient(135deg, rgba(140,12,16,0.3), rgba(0,0,0,0.6))',
+                  flexShrink: 0,
+                  boxShadow: '0 0 12px rgba(229,169,59,0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }} >
+                  {!character.image && <span style={{ fontSize: '1.5rem', opacity: 0.4 }}>👤</span>}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <h1 style={{ fontSize: '1.5rem', color: 'var(--text-gold)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    {character.name}
+                    {character.is_friend === 1 && <span style={{ fontSize: '0.7rem', background: 'rgba(229,169,59,0.15)', color: 'var(--text-gold)', border: '1px solid var(--border-gold)', borderRadius: '4px', padding: '0.1rem 0.5rem' }}>Leitura</span>}
+                  </h1>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    {character.occupation || 'Sem Ocupação'} · {character.age} Anos
+                  </span>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <button type="button" className="btn-occult btn-cyan" onClick={handleCopyPublicShareLink}>
-                  🔗 Compartilhar
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <button type="button" className="btn-occult btn-cyan" onClick={handleCopyPublicShareLink} style={{ padding: '0.5rem 0.8rem', fontSize: '0.75rem' }}>
+                  Compartilhar
                 </button>
-                <button type="button" className="btn-occult-secondary" onClick={handleExportSheet}>
-                  💾 Exportar JSON
+                <button type="button" className="btn-occult-secondary" onClick={handleExportSheet} style={{ padding: '0.5rem 0.8rem', fontSize: '0.75rem' }}>
+                  Exportar JSON
                 </button>
                 {character.is_friend !== 1 && (
-                  <button type="button" className="btn-occult" style={{ background: 'var(--primary-crimson)', borderColor: 'var(--primary-crimson-glow)' }} onClick={handleDeleteInvestigator}>
-                    Sacrificar (Deletar)
+                  <button type="button" className="btn-occult" style={{ background: 'var(--primary-crimson)', borderColor: 'var(--primary-crimson-glow)', padding: '0.5rem 0.8rem', fontSize: '0.75rem' }} onClick={handleDeleteInvestigator}>
+                    Excluir Ficha
                   </button>
                 )}
               </div>
             </div>
+
+            {/* Quick Campaign Join / Status Bar */}
+            {!isAnonymous && character.is_friend !== 1 && (
+              <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', padding: '0.75rem 1.25rem', borderColor: character.session ? 'var(--accent-cyan)' : 'var(--border-light)', borderWidth: '1px', borderStyle: 'solid' }}>
+                {character.session ? (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-cyan)', boxShadow: '0 0 8px var(--accent-cyan)', flexShrink: 0 }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--accent-cyan)' }}>
+                          {character.session.name}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          Código: <strong style={{ color: 'var(--text-crimson)' }}>{character.session.code}</strong> · Mestre: {character.session.gm_username}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-occult-secondary"
+                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.7rem', color: 'var(--text-crimson)' }}
+                      onClick={async () => {
+                        if (!confirm('Deseja desvincular seu investigador desta campanha?')) return;
+                        try {
+                          const res = await fetch('/api/sessions/join', {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ characterId: character.id }),
+                          });
+                          if (res.ok) {
+                            // Refresh character to clear session info
+                            const charRes = await fetch(`/api/characters/${character.id}`);
+                            if (charRes.ok) setCharacter(await charRes.json());
+                          } else {
+                            const err = await res.json();
+                            alert(`Erro: ${err.error}`);
+                          }
+                        } catch (err) { console.error(err); }
+                      }}
+                    >
+                      Sair da Campanha
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Sem campanha vinculada</span>
+                    <form
+                      style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!quickJoinCode.trim()) return;
+                        try {
+                          const res = await fetch('/api/sessions/join', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ code: quickJoinCode.trim(), characterId: character.id }),
+                          });
+                          const data = await res.json();
+                          if (res.ok) {
+                            setQuickJoinCode('');
+                            // Refresh character to get session info
+                            const charRes = await fetch(`/api/characters/${character.id}`);
+                            if (charRes.ok) setCharacter(await charRes.json());
+                          } else {
+                            alert(`Erro: ${data.error}`);
+                          }
+                        } catch (err) { console.error(err); }
+                      }}
+                    >
+                      <input
+                        type="text"
+                        className="gothic-input"
+                        placeholder="Código (ex: CUTH42)"
+                        value={quickJoinCode}
+                        onChange={(e) => setQuickJoinCode(e.target.value.toUpperCase())}
+                        style={{ width: '140px', padding: '0.4rem 0.6rem', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center' }}
+                        maxLength={6}
+                      />
+                      <button type="submit" className="btn-occult btn-cyan" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>
+                        Entrar na Campanha
+                      </button>
+                    </form>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Sub-Tabs Bar */}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', borderBottom: '2px solid var(--border-crimson)', paddingBottom: '0.5rem' }}>

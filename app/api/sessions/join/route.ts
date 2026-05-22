@@ -54,3 +54,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
+
+// DELETE /api/sessions/join - Player leaves a campaign session
+export async function DELETE(request: NextRequest) {
+  try {
+    const userId = parseInt(request.headers.get('x-user-id')!, 10);
+    const { characterId } = await request.json();
+
+    if (!characterId) {
+      return NextResponse.json({ error: 'Personagem é obrigatório' }, { status: 400 });
+    }
+
+    const character = await queryOne('SELECT * FROM characters WHERE id = $1', [characterId]);
+    if (!character || character.user_id !== userId) {
+      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
+    }
+
+    await query('DELETE FROM session_characters WHERE character_id = $1', [characterId]);
+
+    return NextResponse.json({ success: true, message: 'Ficha desvinculada da campanha com sucesso' });
+  } catch (e: any) {
+    console.error('Leave session error:', e);
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
+}

@@ -32,6 +32,7 @@ export default function GmPanel() {
   const [isDiceOpen, setIsDiceOpen] = useState(false);
   const [rollTargetName, setRollTargetName] = useState('');
   const [rollTargetValue, setRollTargetValue] = useState(0);
+  const [rollDiceType, setRollDiceType] = useState<any>('d100');
 
   // Terminal Auto Scroll
   const logTerminalRef = useRef<HTMLDivElement>(null);
@@ -503,15 +504,17 @@ export default function GmPanel() {
   };
 
   // Dice Triggering
-  const triggerDiceRoll = (name: string, value: number) => {
+  const triggerDiceRoll = (name: string, value: number, defaultType: any = 'd100') => {
     setRollTargetName(name);
     setRollTargetValue(value);
+    setRollDiceType(defaultType);
     setIsDiceOpen(true);
   };
 
   const triggerDamageRoll = (expr: string, name: string) => {
     setRollTargetName(`Dano de ${name}`);
     setRollTargetValue(0);
+    setRollDiceType('custom');
     setIsDiceOpen(true);
   };
 
@@ -541,28 +544,100 @@ export default function GmPanel() {
         </div>
 
         <div className="sidebar-nav">
-          <form onSubmit={handleCreateSession} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', margin: '0 0.5rem 1.5rem 0.5rem' }}>
-            <span className="sidebar-item-header" style={{ margin: 0 }}>Nova Campanha</span>
-            <input
-              type="text"
-              className="gothic-input"
-              style={{ fontSize: '0.8rem', padding: '0.4rem' }}
-              placeholder="Nome da Campanha..."
-              value={newSessionName}
-              onChange={(e) => setNewSessionName(e.target.value)}
-            />
-            <input
-              type="text"
-              className="gothic-input"
-              style={{ fontSize: '0.8rem', padding: '0.4rem' }}
-              placeholder="Notas/Descrição..."
-              value={newSessionNotes}
-              onChange={(e) => setNewSessionNotes(e.target.value)}
-            />
-            <button type="submit" className="btn-occult" style={{ padding: '0.5rem', fontSize: '0.75rem', justifyContent: 'center' }}>
-              + Evocar Campanha
-            </button>
-          </form>
+          {selectedSessionId && sessionDetails ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', margin: '0 0.5rem 1.5rem 0.5rem' }}>
+              {/* Button to Exit Campaign */}
+              <button
+                type="button"
+                className="btn-occult"
+                style={{
+                  background: 'var(--bg-crimson)',
+                  color: '#fff',
+                  border: '1px solid var(--border-crimson)',
+                  padding: '0.5rem',
+                  fontSize: '0.75rem',
+                  justifyContent: 'center',
+                  fontWeight: 'bold',
+                  boxShadow: 'none'
+                }}
+                onClick={() => setSelectedSessionId(null)}
+              >
+                🚪 Sair da Campanha
+              </button>
+
+              {/* Glowing Join Code Box */}
+              <div style={{
+                background: 'rgba(0, 243, 255, 0.05)',
+                border: '2px dashed var(--accent-cyan)',
+                borderRadius: '8px',
+                padding: '0.8rem',
+                textAlign: 'center',
+                boxShadow: 'inset 0 0 10px rgba(0, 243, 255, 0.1)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '0.2rem',
+                marginTop: '0.5rem'
+              }}>
+                <span className="gothic-label" style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>CÓDIGO DE ENTRADA</span>
+                <span style={{
+                  fontSize: '1.8rem',
+                  fontWeight: 'bold',
+                  letterSpacing: '2px',
+                  color: 'var(--accent-cyan)',
+                  textShadow: 'var(--glow-cyan)',
+                  lineHeight: '1.1'
+                }}>
+                  {sessionDetails.code}
+                </span>
+                <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>Código para jogadores entrarem</span>
+              </div>
+
+              {/* Roll20 Setup Portal */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+                <span className="sidebar-item-header" style={{ margin: 0, fontSize: '0.7rem' }}>Sintonizar Roll20</span>
+                <input
+                  type="text"
+                  className="gothic-input"
+                  placeholder="URL do Portal Roll20..."
+                  value={roll20Input}
+                  onChange={(e) => setRoll20Input(e.target.value)}
+                  style={{ fontSize: '0.75rem', padding: '0.4rem' }}
+                />
+                <button
+                  type="button"
+                  className="btn-occult"
+                  onClick={handleUpdateRoll20Url}
+                  style={{ padding: '0.4rem', fontSize: '0.75rem', justifyContent: 'center' }}
+                >
+                  🌌 Sintonizar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleCreateSession} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', margin: '0 0.5rem 1.5rem 0.5rem' }}>
+              <span className="sidebar-item-header" style={{ margin: 0 }}>Nova Campanha</span>
+              <input
+                type="text"
+                className="gothic-input"
+                style={{ fontSize: '0.8rem', padding: '0.4rem' }}
+                placeholder="Nome da Campanha..."
+                value={newSessionName}
+                onChange={(e) => setNewSessionName(e.target.value)}
+              />
+              <input
+                type="text"
+                className="gothic-input"
+                style={{ fontSize: '0.8rem', padding: '0.4rem' }}
+                placeholder="Notas/Descrição..."
+                value={newSessionNotes}
+                onChange={(e) => setNewSessionNotes(e.target.value)}
+              />
+              <button type="submit" className="btn-occult" style={{ padding: '0.5rem', fontSize: '0.75rem', justifyContent: 'center' }}>
+                + Evocar Campanha
+              </button>
+            </form>
+          )}
 
           <div className="sidebar-item-header">Suas Campanhas Ativas</div>
           <div className="gm-session-list">
@@ -621,63 +696,41 @@ export default function GmPanel() {
           </div>
         ) : sessionDetails ? (
           <>
-            {/* Header section with big join code display and Roll20 integration */}
-            <div className="glass-panel" style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '1.5rem', alignItems: 'center' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            {/* Header section with session name, description, and dynamic Roll20 launcher */}
+            <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.5rem', gap: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
                 <h1 style={{ fontFamily: 'var(--font-gothic)', color: 'var(--text-gold)', fontSize: '1.8rem', margin: 0 }}>
                   {sessionDetails.name}
                 </h1>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
                   {sessionDetails.notes || 'Nenhuma descrição adicionada.'}
                 </p>
-
-                {/* Roll20 Setup Portal */}
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    className="gothic-input"
-                    placeholder="URL do Portal Roll20 (ex: https://app.roll20.net/...)"
-                    value={roll20Input}
-                    onChange={(e) => setRoll20Input(e.target.value)}
-                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.6rem', flex: 1 }}
-                  />
-                  <button
-                    type="button"
-                    className="btn-occult"
-                    onClick={handleUpdateRoll20Url}
-                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
-                  >
-                    🌌 Sintonizar Portal
-                  </button>
-                </div>
               </div>
 
-              {/* Glowing Join Code Box */}
-              <div style={{
-                background: 'rgba(0, 243, 255, 0.05)',
-                border: '2px dashed var(--accent-cyan)',
-                borderRadius: '8px',
-                padding: '1rem',
-                textAlign: 'center',
-                boxShadow: 'inset 0 0 10px rgba(0, 243, 255, 0.1)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '0.2rem'
-              }}>
-                <span className="gothic-label" style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>CÓDIGO DE ENTRADA DO JOGADOR</span>
-                <span style={{
-                  fontSize: '2.2rem',
-                  fontWeight: 'bold',
-                  letterSpacing: '3px',
-                  color: 'var(--accent-cyan)',
-                  textShadow: 'var(--glow-cyan)',
-                  lineHeight: '1.1'
-                }}>
-                  {sessionDetails.code}
-                </span>
-                <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Entregue este código aos seus jogadores para entrarem</span>
-              </div>
+              {sessionDetails.roll20_url && (
+                <a
+                  href={sessionDetails.roll20_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-occult"
+                  style={{
+                    padding: '0.6rem 1.2rem',
+                    fontSize: '0.85rem',
+                    textDecoration: 'none',
+                    background: 'linear-gradient(135deg, var(--accent-gold) 0%, #b8860b 100%)',
+                    color: '#000',
+                    fontWeight: 'bold',
+                    boxShadow: '0 0 10px rgba(229, 169, 59, 0.3)',
+                    borderRadius: '4px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  ⚔️ Abrir Mesa Roll20 ↗
+                </a>
+              )}
             </div>
 
             {/* Live Campaign Grid (3 Columns: Players List, Live Room Chat & Mono Terminal Log) */}
@@ -861,6 +914,57 @@ export default function GmPanel() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
                 <h2 style={{ fontFamily: 'var(--font-gothic)', color: 'var(--accent-gold)', fontSize: '1.2rem' }}>Grimório (Logs)</h2>
                 
+                {/* Quick Dice Roll Buttons Bar */}
+                <div style={{
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  border: '1.5px solid var(--border-light)',
+                  borderRadius: '6px',
+                  padding: '0.6rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                  boxShadow: 'inset 0 0 10px rgba(0,0,0,0.5)'
+                }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-gold)', fontWeight: 'bold', fontFamily: 'var(--font-gothic)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    🎲 Rolar Dado Rápido:
+                  </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
+                    {[
+                      { type: 'd100', label: 'D100' },
+                      { type: 'd20', label: 'D20' },
+                      { type: 'd12', label: 'D12' },
+                      { type: 'd10', label: 'D10' },
+                      { type: 'd8', label: 'D8' },
+                      { type: 'd6', label: 'D6' },
+                      { type: 'd4', label: 'D4' },
+                      { type: 'custom', label: 'Custom' }
+                    ].map(die => (
+                      <button
+                        key={die.type}
+                        type="button"
+                        className="vital-btn"
+                        style={{
+                          padding: '0.4rem 0.25rem',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          justifyContent: 'center',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid var(--border-light)',
+                          color: '#fff',
+                          fontWeight: 'bold',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                        onClick={() => triggerDiceRoll(`Rápido ${die.label}`, 0, die.type)}
+                      >
+                        {die.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="gm-log-box" ref={logTerminalRef} style={{
                   height: '320px',
                   background: 'rgba(5, 5, 8, 0.95)',
@@ -1002,6 +1106,7 @@ export default function GmPanel() {
         onClose={() => setIsDiceOpen(false)}
         targetName={rollTargetName}
         targetValue={rollTargetValue}
+        defaultDiceType={rollDiceType}
         onRollComplete={handleRollComplete}
       />
     </div>

@@ -29,7 +29,14 @@ export async function middleware(request: NextRequest) {
 
   // Protect all other routes (/, /gm, /api/characters, etc.)
   const token = request.cookies.get('token')?.value;
+  const isAnonymous = request.cookies.get('anonymous')?.value === 'true';
+
   if (!token) {
+    // If the path is exactly '/' and they are in anonymous mode, allow access
+    if (pathname === '/' && isAnonymous) {
+      return NextResponse.next();
+    }
+
     // API routes return 401 Unauthorized
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });

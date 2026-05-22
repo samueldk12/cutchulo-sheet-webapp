@@ -78,95 +78,7 @@ export default function InvestigatorGeneral({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      {/* Vitals HUD (Hp, Mp, Sanity) */}
-      <div className="vitals-grid">
-        <div className="vital-card hp occult-card">
-          <div className="vital-title">Pontos de Vida (PV)</div>
-          <div className="vital-value">
-            {character.hp_current ?? 10} / {character.hp_max ?? 10}
-          </div>
-          <div className="vital-inputs">
-            <button type="button" className="vital-btn" onClick={() => handleAdjustVital('hp_current', -1, 'hp_max')}>-</button>
-            <button type="button" className="vital-btn" onClick={() => handleRollAttribute('Vida (PV)', character.hp_current || 0)}>🎲</button>
-            <button type="button" className="vital-btn" onClick={() => handleAdjustVital('hp_current', 1, 'hp_max')}>+</button>
-          </div>
-          <div className="vital-bar-container">
-            <div className="vital-bar" style={{ width: `${Math.min(100, ((character.hp_current ?? 10) / (character.hp_max ?? 10)) * 100)}%` }}></div>
-          </div>
-        </div>
-
-        <div className="vital-card mp occult-card">
-          <div className="vital-title">Pontos de Magia (PM)</div>
-          <div className="vital-value">
-            {character.mp_current ?? 10} / {character.mp_max ?? 10}
-          </div>
-          <div className="vital-inputs">
-            <button type="button" className="vital-btn" onClick={() => handleAdjustVital('mp_current', -1, 'mp_max')}>-</button>
-            <button type="button" className="vital-btn" onClick={() => handleRollAttribute('Magia (PM)', character.mp_current || 0)}>🎲</button>
-            <button type="button" className="vital-btn" onClick={() => handleAdjustVital('mp_current', 1, 'mp_max')}>+</button>
-          </div>
-          <div className="vital-bar-container">
-            <div className="vital-bar" style={{ width: `${Math.min(100, ((character.mp_current ?? 10) / (character.mp_max ?? 10)) * 100)}%` }}></div>
-          </div>
-        </div>
-
-        <div className="vital-card san occult-card">
-          <div className="vital-title">Sanidade (SAN)</div>
-          <div className="vital-value">
-            {character.san_current ?? 50} / {character.san_max ?? 99}
-          </div>
-          <div className="vital-inputs">
-            <button type="button" className="vital-btn" onClick={() => handleAdjustVital('san_current', -1, 'san_max')}>-</button>
-            <button type="button" className="vital-btn" onClick={() => handleRollAttribute('Sanidade (SAN)', character.san_current || 0)}>🎲</button>
-            <button type="button" className="vital-btn" onClick={() => handleAdjustVital('san_current', 1, 'san_max')}>+</button>
-          </div>
-          <div className="vital-bar-container">
-            <div className="vital-bar" style={{ width: `${Math.min(100, ((character.san_current ?? 50) / (character.san_max ?? 99)) * 100)}%` }}></div>
-          </div>
-        </div>
-      </div>
-
-      {/* Grid of Main Attributes */}
-      <div className="attributes-grid">
-        {[
-          { label: 'FOR (Força)', key: 'str' },
-          { label: 'DES (Destreza)', key: 'dex' },
-          { label: 'INT (Inteligência)', key: 'int_val' },
-          { label: 'CON (Constituição)', key: 'con' },
-          { label: 'APA (Aparência)', key: 'app' },
-          { label: 'POD (Poder)', key: 'pow' },
-          { label: 'TAM (Tamanho)', key: 'siz' },
-          { label: 'EDU (Educação)', key: 'edu' },
-          { label: 'SOR (Sorte)', key: 'luck' },
-        ].map((attr) => {
-          const val = character[attr.key] ?? 50;
-          return (
-            <div key={attr.key} className="attr-card glass-panel" style={{ cursor: 'pointer' }}>
-              <div className="attr-label" onClick={() => onRollClick(attr.label.split(' ')[0], val)}>
-                {attr.label.split(' ')[0]} 🎲
-              </div>
-              <input
-                type="number"
-                className="attr-main-input"
-                value={val}
-                onChange={(e) => handleStatChange(attr.key, parseInt(e.target.value, 10) || 0)}
-              />
-              <div className="attr-subs">
-                <div className="attr-sub-box">
-                  <span className="attr-sub-val">{Math.floor(val / 2)}</span>
-                  <span>1/2</span>
-                </div>
-                <div className="attr-sub-box">
-                  <span className="attr-sub-val">{Math.floor(val / 5)}</span>
-                  <span>1/5</span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Profile & Biography panel */}
+      {/* Profile & Biography panel - Photo side-by-side with core info */}
       <div className="glass-panel" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
         {/* Profile Image card */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
@@ -272,6 +184,94 @@ export default function InvestigatorGeneral({
             />
           </div>
         </div>
+      </div>
+
+      {/* Vitals HUD (Hp, Mp, Sanity) */}
+      <div className="vitals-grid">
+        <div className="vital-card hp occult-card">
+          <div className="vital-title">Pontos de Vida (PV)</div>
+          <div className="vital-value">
+            {character.hp_current ?? 10} / {character.hp_max ?? 10}
+          </div>
+          <div className="vital-inputs">
+            <button type="button" className="vital-btn" onClick={() => handleAdjustVital('hp_current', -1, 'hp_max')}>-</button>
+            <button type="button" className="vital-btn" onClick={() => handleRollAttribute('Vida (PV)', character.hp_current || 0)}>🎲</button>
+            <button type="button" className="vital-btn" onClick={() => handleAdjustVital('hp_current', 1, 'hp_max')}>+</button>
+          </div>
+          <div className="vital-bar-container">
+            <div className="vital-bar" style={{ width: `${Math.min(100, ((character.hp_current ?? 10) / (character.hp_max ?? 10)) * 100)}%` }}></div>
+          </div>
+        </div>
+
+        <div className="vital-card mp occult-card">
+          <div className="vital-title">Pontos de Magia (PM)</div>
+          <div className="vital-value">
+            {character.mp_current ?? 10} / {character.mp_max ?? 10}
+          </div>
+          <div className="vital-inputs">
+            <button type="button" className="vital-btn" onClick={() => handleAdjustVital('mp_current', -1, 'mp_max')}>-</button>
+            <button type="button" className="vital-btn" onClick={() => handleRollAttribute('Magia (PM)', character.mp_current || 0)}>🎲</button>
+            <button type="button" className="vital-btn" onClick={() => handleAdjustVital('mp_current', 1, 'mp_max')}>+</button>
+          </div>
+          <div className="vital-bar-container">
+            <div className="vital-bar" style={{ width: `${Math.min(100, ((character.mp_current ?? 10) / (character.mp_max ?? 10)) * 100)}%` }}></div>
+          </div>
+        </div>
+
+        <div className="vital-card san occult-card">
+          <div className="vital-title">Sanidade (SAN)</div>
+          <div className="vital-value">
+            {character.san_current ?? 50} / {character.san_max ?? 99}
+          </div>
+          <div className="vital-inputs">
+            <button type="button" className="vital-btn" onClick={() => handleAdjustVital('san_current', -1, 'san_max')}>-</button>
+            <button type="button" className="vital-btn" onClick={() => handleRollAttribute('Sanidade (SAN)', character.san_current || 0)}>🎲</button>
+            <button type="button" className="vital-btn" onClick={() => handleAdjustVital('san_current', 1, 'san_max')}>+</button>
+          </div>
+          <div className="vital-bar-container">
+            <div className="vital-bar" style={{ width: `${Math.min(100, ((character.san_current ?? 50) / (character.san_max ?? 99)) * 100)}%` }}></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Grid of Main Attributes */}
+      <div className="attributes-grid">
+        {[
+          { label: 'FOR (Força)', key: 'str' },
+          { label: 'DES (Destreza)', key: 'dex' },
+          { label: 'INT (Inteligência)', key: 'int_val' },
+          { label: 'CON (Constituição)', key: 'con' },
+          { label: 'APA (Aparência)', key: 'app' },
+          { label: 'POD (Poder)', key: 'pow' },
+          { label: 'TAM (Tamanho)', key: 'siz' },
+          { label: 'EDU (Educação)', key: 'edu' },
+          { label: 'SOR (Sorte)', key: 'luck' },
+        ].map((attr) => {
+          const val = character[attr.key] ?? 50;
+          return (
+            <div key={attr.key} className="attr-card glass-panel" style={{ cursor: 'pointer' }}>
+              <div className="attr-label" onClick={() => onRollClick(attr.label.split(' ')[0], val)}>
+                {attr.label.split(' ')[0]} 🎲
+              </div>
+              <input
+                type="number"
+                className="attr-main-input"
+                value={val}
+                onChange={(e) => handleStatChange(attr.key, parseInt(e.target.value, 10) || 0)}
+              />
+              <div className="attr-subs">
+                <div className="attr-sub-box">
+                  <span className="attr-sub-val">{Math.floor(val / 2)}</span>
+                  <span>1/2</span>
+                </div>
+                <div className="attr-sub-box">
+                  <span className="attr-sub-val">{Math.floor(val / 5)}</span>
+                  <span>1/5</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Derived Combat Vitals Grid */}

@@ -7,13 +7,32 @@ export async function POST(request: NextRequest) {
   try {
     const userId = parseInt(request.headers.get('x-user-id')!, 10);
     const body = await request.json();
-    let character = body.character;
     const isFriendExport = body.isFriendExport;
 
-    // Fallback se o corpo do JSON for o próprio personagem (sem embrulho)
-    if (!character && body.name) {
-      character = body;
-    }
+    // Recursive helper to safely unpack the character from any nested structure
+    const extractCharacter = (obj: any): any => {
+      if (!obj) return null;
+      if (obj.character && typeof obj.character === 'object') {
+        const inner = extractCharacter(obj.character);
+        if (inner && inner.name) return inner;
+      }
+      if (obj.name) return obj;
+      if (Array.isArray(obj)) {
+        for (const item of obj) {
+          const found = extractCharacter(item);
+          if (found) return found;
+        }
+      }
+      for (const key of Object.keys(obj)) {
+        if (obj[key] && typeof obj[key] === 'object') {
+          const found = extractCharacter(obj[key]);
+          if (found && found.name) return found;
+        }
+      }
+      return null;
+    };
+
+    let character = extractCharacter(body);
 
     if (!character || !character.name) {
       return NextResponse.json({ error: 'JSON inválido: campo "character" ou "name" obrigatório no arquivo JSON' }, { status: 400 });

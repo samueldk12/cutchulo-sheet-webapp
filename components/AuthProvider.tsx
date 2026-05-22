@@ -15,6 +15,7 @@ interface AuthContextType {
   register: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   checkSession: () => Promise<void>;
+  loginAnonymously: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,10 +33,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await res.json();
         setUser(data.user);
       } else {
-        setUser(null);
-        // If we are not on public pages or /login, redirect to /login
-        if (pathname !== '/login' && !pathname.startsWith('/share/')) {
-          router.push('/login');
+        const isAnon = typeof document !== 'undefined' && document.cookie.split('; ').find(row => row.startsWith('anonymous='))?.split('=')[1] === 'true';
+        if (isAnon) {
+          setUser({ id: -1, username: 'Investigador Anônimo' });
+        } else {
+          setUser(null);
+          // If we are not on public pages or /login, redirect to /login
+          if (pathname !== '/login' && !pathname.startsWith('/share/')) {
+            router.push('/login');
+          }
         }
       }
     } catch (error) {
@@ -59,6 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const data = await res.json();
       if (res.ok && data.success) {
+        // Clean anonymous cookie if logged in successfully
+        document.cookie = "anonymous=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
         setUser(data.user);
         router.push('/');
         return { success: true };
@@ -89,18 +97,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginAnonymously = () => {
+    document.cookie = "anonymous=true; path=/; max-age=86400; SameSite=Strict";
+    setUser({ id: -1, username: 'Investigador Anônimo' });
+    router.push('/');
+  };
+
   const logout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      setUser(null);
-      router.push('/login');
     } catch (err) {
       console.error('Erro ao deslogar:', err);
     }
+    // Clean cookies
+    document.cookie = "anonymous=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    setUser(null);
+    router.push('/login');
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, checkSession }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, checkSession, loginAnonymously }}>
       {children}
     </AuthContext.Provider>
   );

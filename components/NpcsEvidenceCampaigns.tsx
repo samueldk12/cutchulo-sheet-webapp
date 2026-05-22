@@ -731,12 +731,12 @@ export default function NpcsEvidenceCampaigns({
             </div>
           </div>
 
-          {/* Right Column: Live Session View / Chat Room */}
-          <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minHeight: '450px' }}>
+          {/* Right Column: Live Session View / Chat Room + Companions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minHeight: '450px' }}>
             {activeSession ? (
               <>
                 {/* Header info */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
+                <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', padding: '0.75rem 1rem' }}>
                   <div>
                     <h3 style={{ color: 'var(--text-gold)', fontSize: '1.1rem' }}>{activeSession.name}</h3>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
@@ -745,13 +745,12 @@ export default function NpcsEvidenceCampaigns({
                     </span>
                   </div>
                   <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                    {/* Roll20 Link if set */}
                     {detailedSession?.roll20_url ? (
                       <a href={detailedSession.roll20_url} target="_blank" rel="noopener noreferrer" className="roll20-portal">
-                        🌌 Portal Roll20
+                        Portal Roll20
                       </a>
                     ) : (
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Sem portal Roll20 atrelado</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Sem portal Roll20</span>
                     )}
                     <button className="btn-occult-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }} onClick={() => setActiveSession(null)}>
                       Sair da Sessão
@@ -759,77 +758,165 @@ export default function NpcsEvidenceCampaigns({
                   </div>
                 </div>
 
-                {/* Chat Panel */}
-                <div className="chat-panel" style={{ margin: 0, height: '400px' }}>
-                  <div className="chat-header">
-                    <span className="chat-header-title">⛧ Ritual de Chat ao Vivo</span>
-                    <span style={{ fontSize: '0.65rem', color: 'var(--accent-cyan)' }}>Sincronização Ativa 3s</span>
-                  </div>
-
-                  <div id="chat-msg-container" className="chat-messages">
-                    {chatMessages.map((msg) => {
-                      const isMine = currentUser && msg.sender_id === currentUser.id;
-                      const isWhisper = msg.message_type === 'whisper';
-                      const isRoll = msg.message_type === 'roll';
-                      
-                      let msgClass = 'chat-msg';
-                      if (isMine) msgClass += ' mine';
-                      if (isWhisper) msgClass += ' whisper';
-                      if (isRoll) msgClass += ' roll';
-
-                      return (
-                        <div key={msg.id} className={msgClass}>
-                          <div className="chat-msg-meta">
-                            <span className="chat-msg-sender">
-                              {isWhisper ? (
-                                <>
-                                  💬 sussurro {isMine ? `para ${msg.recipient_username}` : `de ${msg.sender_username}`}
-                                </>
-                              ) : (
-                                msg.sender_username
-                              )}
-                            </span>
-                            <span className="chat-msg-time">
-                              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                          
-                          {isRoll ? (
-                            renderRollDetails(msg.roll_details)
-                          ) : (
-                            <span className="chat-msg-content">{msg.content}</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {chatMessages.length === 0 && (
-                      <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                        Nenhuma mensagem enviada nesta sessão. Use os dados ou digite abaixo para iniciar!
-                      </div>
-                    )}
-                  </div>
-
-                  <form onSubmit={handleSendMessage} className="chat-input-area">
-                    <div className="chat-input-row">
-                      <input
-                        type="text"
-                        className="chat-input-field"
-                        placeholder="Digite sua mensagem para a sala..."
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                      />
-                      <button type="submit" className="btn-occult" style={{ padding: '0.4rem 1.2rem', fontSize: '0.8rem' }}>
-                        Enviar
-                      </button>
+                {/* Chat + Companions Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '1rem', flex: 1 }}>
+                  {/* Chat Panel */}
+                  <div className="chat-panel" style={{ margin: 0, height: '400px' }}>
+                    <div className="chat-header">
+                      <span className="chat-header-title">Chat ao Vivo</span>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--accent-cyan)' }}>Sinc. 3s</span>
                     </div>
-                  </form>
+
+                    <div id="chat-msg-container" className="chat-messages">
+                      {chatMessages.map((msg) => {
+                        const isMine = currentUser && msg.sender_id === currentUser.id;
+                        const isWhisper = msg.message_type === 'whisper';
+                        const isRoll = msg.message_type === 'roll';
+                        
+                        let msgClass = 'chat-msg';
+                        if (isMine) msgClass += ' mine';
+                        if (isWhisper) msgClass += ' whisper';
+                        if (isRoll) msgClass += ' roll';
+
+                        return (
+                          <div key={msg.id} className={msgClass}>
+                            <div className="chat-msg-meta">
+                              <span className="chat-msg-sender">
+                                {isWhisper ? (
+                                  <>
+                                    sussurro {isMine ? `para ${msg.recipient_username}` : `de ${msg.sender_username}`}
+                                  </>
+                                ) : (
+                                  msg.sender_username
+                                )}
+                              </span>
+                              <span className="chat-msg-time">
+                                {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            
+                            {isRoll ? (
+                              renderRollDetails(msg.roll_details)
+                            ) : (
+                              <span className="chat-msg-content">{msg.content}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {chatMessages.length === 0 && (
+                        <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                          Nenhuma mensagem enviada nesta sessão.
+                        </div>
+                      )}
+                    </div>
+
+                    <form onSubmit={handleSendMessage} className="chat-input-area">
+                      <div className="chat-input-row">
+                        <input
+                          type="text"
+                          className="chat-input-field"
+                          placeholder="Digite sua mensagem..."
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                        />
+                        <button type="submit" className="btn-occult" style={{ padding: '0.4rem 1.2rem', fontSize: '0.8rem' }}>
+                          Enviar
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Companions Panel (Amigos / Party Members) */}
+                  <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.75rem', height: '400px', overflowY: 'auto' }}>
+                    <h4 style={{ fontSize: '0.8rem', color: 'var(--text-gold)', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.4rem', margin: 0 }}>
+                      Companheiros
+                    </h4>
+                    {(() => {
+                      const companions = (detailedSession?.characters || []).filter(
+                        (c: any) => c.id !== characterId && c.player !== 'NPC'
+                      );
+                      if (companions.length === 0) {
+                        return (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1rem 0' }}>
+                            Nenhum companheiro na sessão.
+                          </span>
+                        );
+                      }
+                      return companions.map((comp: any) => {
+                        const hpPercent = comp.hp_max > 0 ? Math.min(100, (comp.hp_current / comp.hp_max) * 100) : 0;
+                        const hpColor = hpPercent > 60 ? '#4caf50' : hpPercent > 30 ? '#ff9800' : '#f44336';
+                        return (
+                          <div
+                            key={comp.id}
+                            style={{
+                              display: 'flex',
+                              gap: '0.6rem',
+                              alignItems: 'center',
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid var(--border-light)',
+                              borderRadius: '6px',
+                              padding: '0.5rem',
+                            }}
+                          >
+                            {/* Companion Avatar */}
+                            <div style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--border-gold)',
+                              background: comp.image ? `url(${comp.image}) center/cover no-repeat` : 'rgba(0,0,0,0.5)',
+                              flexShrink: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              {!comp.image && <span style={{ fontSize: '0.9rem', opacity: 0.3 }}>👤</span>}
+                            </div>
+                            {/* Companion Info */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-gold)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {comp.name}
+                                </span>
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', flexShrink: 0, marginLeft: '0.3rem' }}>
+                                  {comp.age} anos
+                                </span>
+                              </div>
+                              {/* HP Bar */}
+                              <div style={{ marginTop: '0.3rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>
+                                  <span>PV</span>
+                                  <span style={{ color: hpColor, fontWeight: 'bold' }}>{comp.hp_current}/{comp.hp_max}</span>
+                                </div>
+                                <div style={{
+                                  height: '4px',
+                                  background: 'rgba(255,255,255,0.08)',
+                                  borderRadius: '2px',
+                                  overflow: 'hidden',
+                                }}>
+                                  <div style={{
+                                    width: `${hpPercent}%`,
+                                    height: '100%',
+                                    background: hpColor,
+                                    borderRadius: '2px',
+                                    transition: 'width 0.5s ease, background 0.5s ease',
+                                    boxShadow: `0 0 6px ${hpColor}`,
+                                  }} />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
                 </div>
               </>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--text-muted)', gap: '1rem', textAlign: 'center', padding: '2rem' }}>
+              <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--text-muted)', gap: '1rem', textAlign: 'center', padding: '2rem', minHeight: '450px' }}>
                 <span style={{ fontSize: '3rem' }}>🔮</span>
                 <p style={{ fontSize: '0.85rem', maxWidth: '320px', lineHeight: '1.5' }}>
-                  Selecione uma das campanhas vinculadas na barra sinistra para sintonizar a live chat e abrir portais de sessões.
+                  Selecione uma das campanhas vinculadas para abrir o chat e ver seus companheiros.
                 </p>
               </div>
             )}

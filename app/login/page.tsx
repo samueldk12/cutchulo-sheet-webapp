@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../components/AuthProvider';
 
 export default function LoginPage() {
-  const { login, register } = useAuth();
+  const { login, register, loginAnonymously } = useAuth();
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -139,6 +139,17 @@ export default function LoginPage() {
             {loading ? 'Invocando...' : isRegister ? 'Registrar Ritual' : 'Entrar no Portal'}
           </button>
         </form>
+
+        <div style={{ marginTop: '1rem' }}>
+          <button
+            type="button"
+            className="btn-occult-secondary"
+            onClick={loginAnonymously}
+            style={{ width: '100%', padding: '0.9rem', borderColor: 'var(--accent-gold)', textShadow: 'var(--glow-gold)', fontSize: '0.85rem' }}
+          >
+            👁️ Jogar de Forma Anônima (Sem Conta)
+          </button>
+        </div>
 
         <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
           <button

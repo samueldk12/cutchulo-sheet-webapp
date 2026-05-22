@@ -38,11 +38,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const weapons = await query('SELECT * FROM weapons WHERE character_id = $1', [characterId]);
     const possessions = await query('SELECT * FROM possessions WHERE character_id = $1', [characterId]);
 
+    // Look up any campaign session this character is linked to
+    const sessionInfo = await queryOne(`
+      SELECT s.id, s.name, s.code, u.username as gm_username
+      FROM sessions s
+      JOIN session_characters sc ON sc.session_id = s.id
+      JOIN users u ON s.user_id = u.id
+      WHERE sc.character_id = $1
+      LIMIT 1
+    `, [characterId]);
+
     return NextResponse.json({
       ...char,
       skills: skills.rows,
       weapons: weapons.rows,
       possessions: possessions.rows,
+      session: sessionInfo || null,
     });
   } catch (e: any) {
     console.error('Get character details error:', e);
