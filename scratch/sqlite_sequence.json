@@ -1,0 +1,30 @@
+[
+  {
+    "name": "sessions",
+    "seq": 2
+  },
+  {
+    "name": "characters",
+    "seq": 2
+  },
+  {
+    "name": "skills",
+    "seq": 265
+  },
+  {
+    "name": "weapons",
+    "seq": 7
+  },
+  {
+    "name": "possessions",
+    "seq": 6
+  },
+  {
+    "name": "dice_history",
+    "seq": 39
+  },
+  {
+    "name": "users",
+    "seq": 10
+  }
+]

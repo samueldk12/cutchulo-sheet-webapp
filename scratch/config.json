@@ -1,0 +1,42 @@
+[
+  {
+    "key": "formula_hp",
+    "value": "Math.floor((CON + SIZ) / 10)"
+  },
+  {
+    "key": "formula_mp",
+    "value": "Math.floor(POW / 5)"
+  },
+  {
+    "key": "formula_san",
+    "value": "POW * 5"
+  },
+  {
+    "key": "formula_dodge",
+    "value": "Math.floor(DEX / 2)"
+  },
+  {
+    "key": "formula_lang_own",
+    "value": "EDU"
+  },
+  {
+    "key": "formula_mov",
+    "value": "((STR > SIZ && DEX > SIZ) ? 9 : ((STR < SIZ && DEX < SIZ) ? 7 : 8)) - (AGE >= 80 ? 5 : AGE >= 70 ? 4 : AGE >= 60 ? 3 : AGE >= 50 ? 2 : AGE >= 40 ? 1 : 0)"
+  },
+  {
+    "key": "formula_occ_points",
+    "value": "EDU * 4"
+  },
+  {
+    "key": "formula_int_points",
+    "value": "INT * 2"
+  },
+  {
+    "key": "formula_brawl",
+    "value": "25"
+  },
+  {
+    "key": "auto_calc",
+    "value": "true"
+  }
+]

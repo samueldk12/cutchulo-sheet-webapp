@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "character_id": 1,
+    "item": "Medalha do Nobel"
+  },
+  {
+    "id": 2,
+    "character_id": 2,
+    "item": "Garrafa de Whisky"
+  },
+  {
+    "id": 3,
+    "character_id": 2,
+    "item": "Moeda da sorte"
+  },
+  {
+    "id": 4,
+    "character_id": 1,
+    "item": "Maleta de Couro Italiano"
+  },
+  {
+    "id": 5,
+    "character_id": 1,
+    "item": "Vincitore"
+  },
+  {
+    "id": 6,
+    "character_id": 1,
+    "item": ""
+  }
+]

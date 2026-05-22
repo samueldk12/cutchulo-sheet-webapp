@@ -1,0 +1,353 @@
+[
+  {
+    "id": 1,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 33,
+    "details": "[33]",
+    "rolled_at": "2026-02-28 23:12:47",
+    "user_id": 0
+  },
+  {
+    "id": 2,
+    "character_id": 1,
+    "expression": "1d100+1",
+    "result": 30,
+    "details": "[29]",
+    "rolled_at": "2026-03-06 00:39:13",
+    "user_id": 0
+  },
+  {
+    "id": 3,
+    "character_id": 1,
+    "expression": "1d100+1",
+    "result": 101,
+    "details": "[100]",
+    "rolled_at": "2026-03-06 00:40:18",
+    "user_id": 0
+  },
+  {
+    "id": 4,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 71,
+    "details": "[71]",
+    "rolled_at": "2026-03-06 01:16:16",
+    "user_id": 0
+  },
+  {
+    "id": 5,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 82,
+    "details": "[82]",
+    "rolled_at": "2026-03-13 00:33:48",
+    "user_id": 0
+  },
+  {
+    "id": 6,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 83,
+    "details": "[83]",
+    "rolled_at": "2026-03-20 00:08:24",
+    "user_id": 0
+  },
+  {
+    "id": 7,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 63,
+    "details": "[63]",
+    "rolled_at": "2026-03-20 00:08:25",
+    "user_id": 0
+  },
+  {
+    "id": 8,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 38,
+    "details": "[38]",
+    "rolled_at": "2026-03-20 00:08:28",
+    "user_id": 0
+  },
+  {
+    "id": 9,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 1,
+    "details": "[1]",
+    "rolled_at": "2026-03-20 00:08:28",
+    "user_id": 0
+  },
+  {
+    "id": 10,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 70,
+    "details": "[70]",
+    "rolled_at": "2026-03-20 00:08:30",
+    "user_id": 0
+  },
+  {
+    "id": 11,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 47,
+    "details": "[47]",
+    "rolled_at": "2026-03-20 00:08:31",
+    "user_id": 0
+  },
+  {
+    "id": 12,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 13,
+    "details": "[13]",
+    "rolled_at": "2026-03-20 00:08:32",
+    "user_id": 0
+  },
+  {
+    "id": 13,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 64,
+    "details": "[64]",
+    "rolled_at": "2026-03-20 00:08:32",
+    "user_id": 0
+  },
+  {
+    "id": 14,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 91,
+    "details": "[91]",
+    "rolled_at": "2026-03-20 00:08:33",
+    "user_id": 0
+  },
+  {
+    "id": 15,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 76,
+    "details": "[76]",
+    "rolled_at": "2026-03-20 00:08:33",
+    "user_id": 0
+  },
+  {
+    "id": 16,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 24,
+    "details": "[24]",
+    "rolled_at": "2026-03-20 00:08:34",
+    "user_id": 0
+  },
+  {
+    "id": 17,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 95,
+    "details": "[95]",
+    "rolled_at": "2026-03-20 00:08:34",
+    "user_id": 0
+  },
+  {
+    "id": 18,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 85,
+    "details": "[85]",
+    "rolled_at": "2026-03-20 00:08:35",
+    "user_id": 0
+  },
+  {
+    "id": 19,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 19,
+    "details": "[19]",
+    "rolled_at": "2026-03-20 00:08:35",
+    "user_id": 0
+  },
+  {
+    "id": 20,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 25,
+    "details": "[25]",
+    "rolled_at": "2026-03-20 00:08:36",
+    "user_id": 0
+  },
+  {
+    "id": 21,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 32,
+    "details": "[32]",
+    "rolled_at": "2026-03-20 00:22:36",
+    "user_id": 0
+  },
+  {
+    "id": 22,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 28,
+    "details": "[28]",
+    "rolled_at": "2026-03-20 01:21:25",
+    "user_id": 0
+  },
+  {
+    "id": 23,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 41,
+    "details": "[41]",
+    "rolled_at": "2026-03-20 01:50:33",
+    "user_id": 0
+  },
+  {
+    "id": 24,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 11,
+    "details": "[11]",
+    "rolled_at": "2026-04-10 01:49:10",
+    "user_id": 10
+  },
+  {
+    "id": 25,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 43,
+    "details": "[43]",
+    "rolled_at": "2026-04-18 00:55:57",
+    "user_id": 0
+  },
+  {
+    "id": 26,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 39,
+    "details": "[39]",
+    "rolled_at": "2026-04-18 01:17:38",
+    "user_id": 0
+  },
+  {
+    "id": 27,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 96,
+    "details": "[96]",
+    "rolled_at": "2026-04-24 00:05:35",
+    "user_id": 0
+  },
+  {
+    "id": 28,
+    "character_id": 1,
+    "expression": "1d10",
+    "result": 4,
+    "details": "[4]",
+    "rolled_at": "2026-04-24 00:05:43",
+    "user_id": 0
+  },
+  {
+    "id": 29,
+    "character_id": 1,
+    "expression": "4d4",
+    "result": 8,
+    "details": "[2,2,1,3]",
+    "rolled_at": "2026-04-24 00:15:18",
+    "user_id": 0
+  },
+  {
+    "id": 30,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 82,
+    "details": "[82]",
+    "rolled_at": "2026-04-24 00:41:43",
+    "user_id": 0
+  },
+  {
+    "id": 31,
+    "character_id": 1,
+    "expression": "3d100",
+    "result": 85,
+    "details": "[19,25,41]",
+    "rolled_at": "2026-04-24 00:42:48",
+    "user_id": 0
+  },
+  {
+    "id": 32,
+    "character_id": 1,
+    "expression": "2d6",
+    "result": 3,
+    "details": "[2,1]",
+    "rolled_at": "2026-04-24 00:43:33",
+    "user_id": 0
+  },
+  {
+    "id": 33,
+    "character_id": 1,
+    "expression": "2d3",
+    "result": 4,
+    "details": "[2,2]",
+    "rolled_at": "2026-04-24 00:43:40",
+    "user_id": 0
+  },
+  {
+    "id": 34,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 78,
+    "details": "[78]",
+    "rolled_at": "2026-04-24 00:44:26",
+    "user_id": 0
+  },
+  {
+    "id": 35,
+    "character_id": 1,
+    "expression": "1d6",
+    "result": 1,
+    "details": "[1]",
+    "rolled_at": "2026-04-24 00:44:36",
+    "user_id": 0
+  },
+  {
+    "id": 36,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 49,
+    "details": "[49]",
+    "rolled_at": "2026-04-24 01:36:36",
+    "user_id": 0
+  },
+  {
+    "id": 37,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 65,
+    "details": "[65]",
+    "rolled_at": "2026-05-01 00:22:40",
+    "user_id": 0
+  },
+  {
+    "id": 38,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 56,
+    "details": "[56]",
+    "rolled_at": "2026-05-01 00:47:31",
+    "user_id": 0
+  },
+  {
+    "id": 39,
+    "character_id": 1,
+    "expression": "1d100",
+    "result": 76,
+    "details": "[76]",
+    "rolled_at": "2026-05-22 01:03:42",
+    "user_id": 0
+  }
+]

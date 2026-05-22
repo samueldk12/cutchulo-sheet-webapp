@@ -1,0 +1,82 @@
+[
+  {
+    "id": 1,
+    "username": "test",
+    "password_hash": "$2b$10$Oj.fgpVhtRwg3VhA07BR..4wRr0loc3ndWG3bp/NwuXQ57KtJIKya",
+    "is_master": 1,
+    "display_name": "test",
+    "created_at": "2026-04-06 15:14:39"
+  },
+  {
+    "id": 2,
+    "username": "test2",
+    "password_hash": "$2b$10$mJKX.0oq2teDc2H3yiyOQ.2rTi/v1zui3USBNtp.ynYvLR4nTXcLC",
+    "is_master": 0,
+    "display_name": "test2",
+    "created_at": "2026-04-06 15:14:52"
+  },
+  {
+    "id": 3,
+    "username": "test3",
+    "password_hash": "$2b$10$rzJSNAQb9fqDR6xucL9tuuuME.dS2hHTG01/Q5Poxu22o6bZqvEAW",
+    "is_master": 0,
+    "display_name": "test3",
+    "created_at": "2026-04-06 15:15:15"
+  },
+  {
+    "id": 4,
+    "username": "testuser99",
+    "password_hash": "$2b$10$Ckg3GCGXqDA1.1q5hchAt.POW66TSaUr16KXfNUMivGkFR/cPEjgO",
+    "is_master": 0,
+    "display_name": "testuser99",
+    "created_at": "2026-04-06 15:50:59"
+  },
+  {
+    "id": 5,
+    "username": "testuser200",
+    "password_hash": "$2b$10$Qu4iuwPdLbCE/p3sBiaYhezlxCrxItOksjOMLFHQmRvqV9i8FCRo2",
+    "is_master": 0,
+    "display_name": "testuser200",
+    "created_at": "2026-04-06 16:01:50"
+  },
+  {
+    "id": 6,
+    "username": "user999",
+    "password_hash": "$2b$10$dq2.brwEHzLyR2BHCaLy5.EL4TvD7.b0N6RLX79Z9huHGk.k5wU9a",
+    "is_master": 0,
+    "display_name": "user999",
+    "created_at": "2026-04-06 16:19:28"
+  },
+  {
+    "id": 7,
+    "username": "admin",
+    "password_hash": "$2b$10$mtvWN6ejwlqagBCwZQUp/u9Nmsbc0p2JD9Bc6qCTSpCaWTQgy.zU.",
+    "is_master": 0,
+    "display_name": "admin",
+    "created_at": "2026-04-06 16:20:40"
+  },
+  {
+    "id": 8,
+    "username": "admin2",
+    "password_hash": "$2b$10$zKnrAAC7Z0ksvtDEB/TbEO7C2MStNRSqvqnItvK7WV4hqi2XsOcDK",
+    "is_master": 0,
+    "display_name": "admin2",
+    "created_at": "2026-04-06 16:21:47"
+  },
+  {
+    "id": 9,
+    "username": "testuser100",
+    "password_hash": "$2b$10$Wx1Afnw00UudRiqelV3Dxu3xY32OdlOZkGBv/9spBBsFoVFGhCthq",
+    "is_master": 0,
+    "display_name": "testuser100",
+    "created_at": "2026-04-06 18:37:03"
+  },
+  {
+    "id": 10,
+    "username": "samuel.arao@gmail.com",
+    "password_hash": "$2b$10$vCXeKn.ErfPc5C0xkUda1eCm76xsVdHrpHRNyWH2Ls0tE03y8KyiO",
+    "is_master": 0,
+    "display_name": "samuel.arao@gmail.com",
+    "created_at": "2026-04-10 00:07:51"
+  }
+]
