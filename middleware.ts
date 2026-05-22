@@ -9,7 +9,7 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/share/') ||
-    pathname.startsWith('/api/auth/') ||
+    (pathname.startsWith('/api/auth/') && pathname !== '/api/auth/me') ||
     pathname.startsWith('/api/share/') ||
     pathname.startsWith('/_next') ||
     pathname.includes('.')
