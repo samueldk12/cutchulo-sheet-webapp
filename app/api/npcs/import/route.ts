@@ -7,9 +7,9 @@ export async function POST(request: NextRequest) {
     const userId = parseInt(request.headers.get('x-user-id')!, 10);
     const data = await request.json();
 
-    const list = data.npcs || (data.npc ? [data.npc] : null);
+    const list = Array.isArray(data) ? data : (data.npcs || (data.npc ? [data.npc] : null));
     if (!Array.isArray(list)) {
-      return NextResponse.json({ error: 'Formato inválido: esperado { npcs: [...] }' }, { status: 400 });
+      return NextResponse.json({ error: 'Formato inválido: esperado array de NPCs ou objeto { npcs: [...] }' }, { status: 400 });
     }
 
     const insertedIds: number[] = [];

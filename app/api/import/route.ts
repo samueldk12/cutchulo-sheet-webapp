@@ -6,10 +6,17 @@ import { randomUUID } from 'crypto';
 export async function POST(request: NextRequest) {
   try {
     const userId = parseInt(request.headers.get('x-user-id')!, 10);
-    const { character, isFriendExport } = await request.json();
+    const body = await request.json();
+    let character = body.character;
+    const isFriendExport = body.isFriendExport;
+
+    // Fallback se o corpo do JSON for o próprio personagem (sem embrulho)
+    if (!character && body.name) {
+      character = body;
+    }
 
     if (!character || !character.name) {
-      return NextResponse.json({ error: 'JSON inválido: campo "character" obrigatório' }, { status: 400 });
+      return NextResponse.json({ error: 'JSON inválido: campo "character" ou "name" obrigatório no arquivo JSON' }, { status: 400 });
     }
 
     let uuid = character.uuid || randomUUID();
