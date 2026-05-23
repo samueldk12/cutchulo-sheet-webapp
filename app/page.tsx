@@ -6,8 +6,7 @@ import InvestigatorGeneral from '../components/InvestigatorGeneral';
 import InvestigatorSkills from '../components/InvestigatorSkills';
 import InvestigatorCombat from '../components/InvestigatorCombat';
 import InvestigatorBackstory from '../components/InvestigatorBackstory';
-import PDFViewerModule from '../components/PDFViewerModule';
-import NpcsEvidenceCampaigns from '../components/NpcsEvidenceCampaigns';
+import FloatingCampaignDrawer from '../components/FloatingCampaignDrawer';
 import DiceRollerModal from '../components/DiceRollerModal';
 import Link from 'next/link';
 
@@ -150,11 +149,6 @@ export default function Dashboard() {
         setCharacters(data);
       }
       
-      const resFriends = await fetch('/api/characters?friends=true');
-      if (resFriends.ok) {
-        const dataFriends = await resFriends.json();
-        setFriends(dataFriends);
-      }
     } catch (err) {
       console.error('Erro ao carregar dados do painel:', err);
     }
@@ -165,6 +159,47 @@ export default function Dashboard() {
       loadSidebarData();
     }
   }, [user]);
+
+  // Load companions inside campaign if selected character has session, else fallback to standard friends list
+  useEffect(() => {
+    if (isAnonymous) {
+      setFriends([]);
+      return;
+    }
+
+    if (character?.session?.id) {
+      fetch(`/api/sessions/${character.session.id}`)
+        .then(res => {
+          if (res.ok) return res.json();
+          throw new Error('Failed to fetch session companions');
+        })
+        .then(data => {
+          const companions = (data.characters || [])
+            .filter((c: any) => c.id !== selectedCharId)
+            .map((c: any) => ({
+              ...c,
+              is_friend: 1 // treat as read-only companion sheet
+            }));
+          setFriends(companions);
+        })
+        .catch(err => {
+          console.error('Error fetching campaign companions:', err);
+        });
+    } else {
+      // Standard friends list
+      fetch('/api/characters?friends=true')
+        .then(res => {
+          if (res.ok) return res.json();
+          return [];
+        })
+        .then(data => {
+          setFriends(data);
+        })
+        .catch(err => {
+          console.error('Error fetching friends:', err);
+        });
+    }
+  }, [selectedCharId, character?.session?.id, isAnonymous]);
 
   // Fetch full character sheet details when selected
   useEffect(() => {
@@ -694,13 +729,17 @@ export default function Dashboard() {
         </div>
 
         <div className="sidebar-nav">
-          <button type="button" className="btn-occult" style={{ padding: '0.75rem', fontSize: '0.8rem', textAlign: 'center', justifyContent: 'center' }} onClick={handleCreateInvestigator}>
-            + Criar Investigador
-          </button>
-          
-          <button type="button" className="btn-occult-secondary" style={{ padding: '0.6rem', fontSize: '0.75rem', justifyContent: 'center' }} onClick={() => fileInputRef.current?.click()}>
-            📥 Importar Ficha JSON
-          </button>
+          {!selectedCharId && (
+            <>
+              <button type="button" className="btn-occult" style={{ padding: '0.75rem', fontSize: '0.8rem', textAlign: 'center', justifyContent: 'center' }} onClick={handleCreateInvestigator}>
+                + Criar Investigador
+              </button>
+              
+              <button type="button" className="btn-occult-secondary" style={{ padding: '0.6rem', fontSize: '0.75rem', justifyContent: 'center' }} onClick={() => fileInputRef.current?.click()}>
+                📥 Importar Ficha JSON
+              </button>
+            </>
+          )}
           <input type="file" ref={fileInputRef} accept=".json" onChange={handleImportSheet} style={{ display: 'none' }} />
 
           <div className="sidebar-item-header">Seus Investigadores</div>
@@ -837,31 +876,54 @@ export default function Dashboard() {
                         </span>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      className="btn-occult-secondary"
-                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.7rem', color: 'var(--text-crimson)' }}
-                      onClick={async () => {
-                        if (!confirm('Deseja desvincular seu investigador desta campanha?')) return;
-                        try {
-                          const res = await fetch('/api/sessions/join', {
-                            method: 'DELETE',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ characterId: character.id }),
-                          });
-                          if (res.ok) {
-                            // Refresh character to clear session info
-                            const charRes = await fetch(`/api/characters/${character.id}`);
-                            if (charRes.ok) setCharacter(await charRes.json());
-                          } else {
-                            const err = await res.json();
-                            alert(`Erro: ${err.error}`);
-                          }
-                        } catch (err) { console.error(err); }
-                      }}
-                    >
-                      Sair da Campanha
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                      {character.session.roll20_url && (
+                        <a
+                          href={character.session.roll20_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-occult"
+                          style={{
+                            padding: '0.4rem 0.8rem',
+                            fontSize: '0.7rem',
+                            background: 'linear-gradient(135deg, var(--accent-gold) 0%, #b8860b 100%)',
+                            color: '#000',
+                            fontWeight: 'bold',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            textDecoration: 'none'
+                          }}
+                        >
+                          🎲 Abrir Roll20
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        className="btn-occult-secondary"
+                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.7rem', color: 'var(--text-crimson)' }}
+                        onClick={async () => {
+                          if (!confirm('Deseja desvincular seu investigador desta campanha?')) return;
+                          try {
+                            const res = await fetch('/api/sessions/join', {
+                              method: 'DELETE',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ characterId: character.id }),
+                            });
+                            if (res.ok) {
+                              // Refresh character to clear session info
+                              const charRes = await fetch(`/api/characters/${character.id}`);
+                              if (charRes.ok) setCharacter(await charRes.json());
+                            } else {
+                              const err = await res.json();
+                              alert(`Erro: ${err.error}`);
+                            }
+                          } catch (err) { console.error(err); }
+                        }}
+                      >
+                        Sair da Campanha
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <>
@@ -914,8 +976,6 @@ export default function Dashboard() {
                 { label: 'Perícias', key: 'skills' },
                 { label: 'Combate & Equipamentos', key: 'combat' },
                 { label: 'Histórico & Dossiê', key: 'backstory' },
-                { label: 'Biblioteca (Grimórios)', key: 'books' },
-                { label: 'Evidências & NPCs', key: 'npcs' },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -966,14 +1026,6 @@ export default function Dashboard() {
                   onChange={character.is_friend === 1 ? () => {} : handleFieldChange}
                 />
               )}
-              {activeTab === 'books' && <PDFViewerModule />}
-              {activeTab === 'npcs' && (
-                <NpcsEvidenceCampaigns
-                  characterId={character.id}
-                  currentUser={user}
-                  onRollClick={triggerDiceRoll}
-                />
-              )}
             </div>
           </>
         ) : (
@@ -1005,6 +1057,15 @@ export default function Dashboard() {
         targetName={rollTargetName}
         targetValue={rollTargetValue}
       />
+
+      {/* Floating Side Drawer for Campaign (Chat, Grimoire, Library) */}
+      {character && character.session && (
+        <FloatingCampaignDrawer
+          character={character}
+          currentUser={user}
+          onRollClick={triggerDiceRoll}
+        />
+      )}
     </div>
   );
 }

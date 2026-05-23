@@ -277,6 +277,21 @@ export async function initDb() {
       );
     `);
 
+    // 8.5. Spells Table (Grimório)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS spells (
+        id SERIAL PRIMARY KEY,
+        character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL DEFAULT '',
+        cost VARCHAR(255) DEFAULT '',
+        casting_time VARCHAR(255) DEFAULT '',
+        range VARCHAR(255) DEFAULT '',
+        duration VARCHAR(255) DEFAULT '',
+        description TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // 9. Dice History Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dice_history (

@@ -37,10 +37,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const skills = await query('SELECT * FROM skills WHERE character_id = $1 ORDER BY name', [characterId]);
     const weapons = await query('SELECT * FROM weapons WHERE character_id = $1', [characterId]);
     const possessions = await query('SELECT * FROM possessions WHERE character_id = $1', [characterId]);
+    const spells = await query('SELECT * FROM spells WHERE character_id = $1 ORDER BY name', [characterId]);
 
     // Look up any campaign session this character is linked to
     const sessionInfo = await queryOne(`
-      SELECT s.id, s.name, s.code, u.username as gm_username
+      SELECT s.id, s.name, s.code, s.roll20_url, u.username as gm_username
       FROM sessions s
       JOIN session_characters sc ON sc.session_id = s.id
       JOIN users u ON s.user_id = u.id
@@ -53,6 +54,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       skills: skills.rows,
       weapons: weapons.rows,
       possessions: possessions.rows,
+      spells: spells.rows,
       session: sessionInfo || null,
     });
   } catch (e: any) {
@@ -121,12 +123,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const skills = await query('SELECT * FROM skills WHERE character_id = $1 ORDER BY name', [characterId]);
     const weapons = await query('SELECT * FROM weapons WHERE character_id = $1', [characterId]);
     const possessions = await query('SELECT * FROM possessions WHERE character_id = $1', [characterId]);
+    const spells = await query('SELECT * FROM spells WHERE character_id = $1 ORDER BY name', [characterId]);
 
     return NextResponse.json({
       ...char,
       skills: skills.rows,
       weapons: weapons.rows,
       possessions: possessions.rows,
+      spells: spells.rows,
     });
   } catch (e: any) {
     console.error('Update character error:', e);
