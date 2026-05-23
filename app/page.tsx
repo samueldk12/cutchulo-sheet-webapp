@@ -175,7 +175,7 @@ export default function Dashboard() {
         })
         .then(data => {
           const companions = (data.characters || [])
-            .filter((c: any) => c.id !== selectedCharId)
+            .filter((c: any) => c.user_id !== user?.id)
             .map((c: any) => ({
               ...c,
               is_friend: 1 // treat as read-only companion sheet
@@ -199,7 +199,7 @@ export default function Dashboard() {
           console.error('Error fetching friends:', err);
         });
     }
-  }, [selectedCharId, character?.session?.id, isAnonymous]);
+  }, [user?.id, character?.session?.id, isAnonymous]);
 
   // Fetch full character sheet details when selected
   useEffect(() => {
@@ -1002,6 +1002,7 @@ export default function Dashboard() {
                   skills={character.skills}
                   onSkillChange={character.is_friend === 1 ? () => {} : handleSkillChange}
                   onRollClick={triggerDiceRoll}
+                  isReadOnly={character.is_friend === 1}
                 />
               )}
               {activeTab === 'combat' && (

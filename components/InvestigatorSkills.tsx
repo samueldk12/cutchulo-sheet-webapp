@@ -19,12 +19,14 @@ interface InvestigatorSkillsProps {
   skills: Skill[];
   onSkillChange: (skillId: number, field: string, value: number) => void;
   onRollClick: (name: string, value: number) => void;
+  isReadOnly?: boolean;
 }
 
 export default function InvestigatorSkills({
   skills = [],
   onSkillChange,
-  onRollClick
+  onRollClick,
+  isReadOnly = false
 }: InvestigatorSkillsProps) {
   const [filterText, setFilterText] = useState('');
   const [activePointsTab, setActivePointsTab] = useState<'all' | 'occ' | 'int'>('all');
@@ -107,18 +109,19 @@ export default function InvestigatorSkills({
           return (
             <div key={s.id} className="skill-row">
               <div className="skill-name">
-                <input
-                  type="checkbox"
-                  className="skill-check"
-                  checked={s.checked || false}
-                  onChange={(e) => onSkillChange(s.id, 'checked', e.target.checked ? 1 : 0)}
-                />
                 <span 
                   onClick={() => onRollClick(s.name, totalVal)} 
-                  style={{ cursor: 'pointer' }}
+                  style={{
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    transition: 'all 0.2s ease'
+                  }}
+                  className="skill-name-clickable"
                   title="Clique para rolar teste desta perícia"
                 >
-                  {s.name} 🎲
+                  {s.name} <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>🎲</span>
                 </span>
               </div>
 
@@ -127,45 +130,49 @@ export default function InvestigatorSkills({
                 <input
                   type="number"
                   className="skill-main-input"
-                  style={{ fontSize: '0.75rem', width: '25px', color: 'var(--text-gold)', opacity: s.occ_points > 0 ? 1 : 0.4 }}
+                  style={{ fontSize: '0.85rem', width: '42px', color: 'var(--text-gold)', opacity: s.occ_points > 0 ? 1 : 0.4 }}
                   title="Pontos de Ocupação"
                   value={s.occ_points || 0}
                   onChange={(e) => handlePointChange(s, 'occ_points', parseInt(e.target.value, 10) || 0)}
+                  readOnly={isReadOnly}
                 />
 
                 {/* Interesse Points */}
                 <input
                   type="number"
                   className="skill-main-input"
-                  style={{ fontSize: '0.75rem', width: '25px', color: 'var(--accent-cyan)', opacity: s.int_points > 0 ? 1 : 0.4 }}
+                  style={{ fontSize: '0.85rem', width: '42px', color: 'var(--accent-cyan)', opacity: s.int_points > 0 ? 1 : 0.4 }}
                   title="Pontos de Interesse"
                   value={s.int_points || 0}
                   onChange={(e) => handlePointChange(s, 'int_points', parseInt(e.target.value, 10) || 0)}
+                  readOnly={isReadOnly}
                 />
 
                 {/* Game / Experiência Points */}
                 <input
                   type="number"
                   className="skill-main-input"
-                  style={{ fontSize: '0.75rem', width: '25px', color: 'var(--accent-green)', opacity: s.game_points > 0 ? 1 : 0.4 }}
+                  style={{ fontSize: '0.85rem', width: '42px', color: 'var(--accent-green)', opacity: s.game_points > 0 ? 1 : 0.4 }}
                   title="Pontos de Experiência obtidos em jogo"
                   value={s.game_points || 0}
                   onChange={(e) => handlePointChange(s, 'game_points', parseInt(e.target.value, 10) || 0)}
+                  readOnly={isReadOnly}
                 />
 
                 {/* Total Value Display */}
                 <span style={{
-                  fontSize: '0.95rem',
+                  fontSize: '1.05rem',
                   fontWeight: 'bold',
-                  width: '32px',
+                  width: '45px',
                   textAlign: 'right',
-                  color: totalVal > s.base_value ? 'var(--text-crimson)' : 'var(--text-primary)'
+                  color: totalVal > s.base_value ? 'var(--text-crimson)' : 'var(--text-primary)',
+                  marginRight: '0.25rem'
                 }}>
                   {totalVal}
                 </span>
 
                 {/* Subvalues half and fifth */}
-                <div style={{ display: 'flex', flexDirection: 'column', fontSize: '0.6rem', color: 'var(--text-muted)', marginLeft: '0.25rem', width: '24px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', fontSize: '0.65rem', color: 'var(--text-muted)', marginLeft: '0.25rem', width: '28px' }}>
                   <span>{Math.floor(totalVal / 2)}</span>
                   <span>{Math.floor(totalVal / 5)}</span>
                 </div>

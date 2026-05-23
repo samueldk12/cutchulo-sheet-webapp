@@ -735,48 +735,7 @@ button, input, select, textarea {
   gap: 0.5rem;
 }
 
-.skill-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: rgba(0,0,0,0.2);
-  border: 1px solid var(--border-light);
-  border-radius: 4px;
-  padding: 0.4rem 0.6rem;
-  transition: var(--transition-smooth);
-}
 
-.skill-row:hover {
-  border-color: var(--border-crimson);
-}
-
-.skill-name {
-  font-size: 0.85rem;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.skill-value-inputs {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.skill-main-input {
-  background: transparent;
-  border: none;
-  font-weight: bold;
-  font-size: 0.95rem;
-  width: 32px;
-  text-align: center;
-}
-
-.skill-main-input:focus {
-  outline: none;
-  color: var(--accent-cyan);
-}
 
 .skill-points {
   font-size: 0.65rem;
@@ -1147,6 +1106,76 @@ button, input, select, textarea {
 
 .chat-msg-time {
   font-size: 0.65rem;
+}
+
+.skill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(90deg, rgba(20, 20, 30, 0.6) 0%, rgba(10, 10, 15, 0.4) 100%);
+  border: 1px solid var(--border-light);
+  border-left: 3px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  padding: 0.65rem 0.9rem;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.skill-row:hover {
+  border-color: rgba(229, 169, 59, 0.25);
+  border-left: 3px solid var(--accent-gold);
+  background: linear-gradient(90deg, rgba(229, 169, 59, 0.06) 0%, rgba(20, 20, 30, 0.7) 100%);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
+  transform: translateX(4px);
+}
+
+.skill-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.skill-name-clickable {
+  transition: all 0.2s ease;
+}
+
+.skill-name-clickable:hover {
+  color: var(--text-gold);
+  text-shadow: 0 0 8px rgba(229, 169, 59, 0.5);
+}
+
+.skill-value-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.skill-main-input {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 0.9rem;
+  width: 42px;
+  text-align: center;
+  padding: 0.25rem 0;
+  transition: all 0.2s ease;
+  color: #fff;
+}
+
+.skill-main-input:focus {
+  outline: none;
+  border-color: var(--accent-cyan);
+  background: rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.25);
+}
+
+.skill-main-input[readonly] {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  cursor: default;
 }
 
 .chat-msg-content {
