@@ -137,11 +137,6 @@ export default function FloatingCampaignDrawer({
                   };
 
                   setToasts(prev => [...prev, newToast]);
-
-                  // Auto dismiss toast after 4s
-                  setTimeout(() => {
-                    setToasts(prev => prev.filter(t => t.id !== newToast.id));
-                  }, 4000);
                 }
               });
             }
@@ -547,86 +542,174 @@ export default function FloatingCampaignDrawer({
   // Drawer Width varies dynamically based on active tab: expandable when reading PDF
   const drawerWidth = activeTab === 'library' ? '860px' : '440px';
 
+  const latestNotification = toasts[toasts.length - 1];
+  const handleDismissNotification = () => {
+    if (latestNotification) {
+      setToasts(prev => prev.filter(t => t.id !== latestNotification.id));
+    }
+  };
+
   return (
     <>
-      {/* Toast Notification Container */}
-      <div style={{
-        position: 'fixed',
-        top: '20px',
-        right: '20px',
-        zIndex: 10000,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.75rem',
-        maxWidth: '320px',
-        pointerEvents: 'none'
-      }}>
-        {toasts.map(t => (
-          <div
-            key={t.id}
+      {/* Modal Notification Overlay */}
+      {latestNotification && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(5, 5, 8, 0.88)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 15000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2rem',
+          animation: 'fadeIn 0.25s ease'
+        }}>
+          <div 
+            className="glass-panel"
             style={{
-              background: 'rgba(12, 12, 20, 0.95)',
-              borderLeft: t.type === 'roll' || t.title.includes('Roll20') ? '4px solid var(--accent-cyan)' : '4px solid var(--primary-crimson)',
-              borderTop: '1px solid rgba(255,255,255,0.05)',
-              borderBottom: '1px solid rgba(255,255,255,0.05)',
-              borderRight: '1px solid rgba(255,255,255,0.05)',
-              borderRadius: '0 6px 6px 0',
-              padding: '0.75rem 1rem',
-              boxShadow: t.type === 'roll' || t.title.includes('Roll20') ? '0 4px 15px rgba(0, 229, 255, 0.25)' : '0 4px 15px rgba(140, 12, 16, 0.25)',
-              color: '#fff',
-              fontSize: '0.85rem',
-              transition: 'all 0.3s ease',
-              animation: 'slideInRight 0.3s ease-out',
-              backdropFilter: 'blur(8px)',
-              pointerEvents: 'auto',
+              width: '100%',
+              maxWidth: '460px',
+              background: 'rgba(12, 12, 20, 0.98)',
+              border: '1.5px solid var(--border-crimson)',
+              boxShadow: '0 10px 45px rgba(0,0,0,0.85), 0 0 35px rgba(140,12,16,0.3)',
+              borderRadius: '8px',
+              padding: '2rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.35rem'
+              alignItems: 'center',
+              gap: '1.5rem',
+              position: 'relative',
+              textAlign: 'center'
             }}
           >
-            <div style={{ fontWeight: 'bold', color: t.type === 'roll' || t.title.includes('Roll20') ? 'var(--accent-cyan)' : 'var(--text-gold)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>{t.title}</span>
-              <button 
-                onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
-                style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '0.8rem', cursor: 'pointer', opacity: 0.5 }}
-              >
-                ×
-              </button>
+            {/* Glow Element */}
+            <div style={{
+              position: 'absolute',
+              top: '-1px',
+              left: '20%',
+              right: '20%',
+              height: '2px',
+              background: 'linear-gradient(90deg, transparent, var(--primary-crimson), transparent)'
+            }} />
+
+            {/* Místico Header Icon */}
+            <div style={{
+              width: '70px',
+              height: '70px',
+              borderRadius: '50%',
+              background: 'rgba(140, 12, 16, 0.1)',
+              border: '1.5px solid var(--border-crimson)',
+              boxShadow: '0 0 20px rgba(140, 12, 16, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '2.2rem'
+            }}>
+              {latestNotification.title.includes('Rolagem') ? '🎲' : 
+               latestNotification.title.includes('Roll20') ? '🌌' : 
+               latestNotification.title.includes('Magia') ? '🔮' : '🤫'}
             </div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
-              {t.content}
+
+            {/* Title */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <span className="gothic-label" style={{ fontSize: '0.75rem', letterSpacing: '0.15em', color: 'var(--text-muted)' }}>
+                MANIFESTAÇÃO NA MESA
+              </span>
+              <h2 style={{
+                fontFamily: 'var(--font-gothic)',
+                color: 'var(--text-gold)',
+                fontSize: '1.6rem',
+                margin: 0,
+                textShadow: '0 0 10px rgba(229,169,59,0.2)'
+              }}>
+                {latestNotification.title}
+              </h2>
             </div>
-            {t.url && (
-              <a
-                href={t.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-occult"
-                style={{
-                  marginTop: '0.4rem',
-                  padding: '0.4rem 0.8rem',
-                  fontSize: '0.7rem',
-                  background: 'linear-gradient(135deg, var(--accent-cyan) 0%, #008b8b 100%)',
-                  color: '#000',
-                  fontWeight: 'bold',
-                  textAlign: 'center',
-                  textDecoration: 'none',
-                  borderRadius: '4px',
-                  boxShadow: '0 0 10px rgba(0, 229, 255, 0.3)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.25rem',
-                  fontFamily: 'var(--font-gothic)',
-                  pointerEvents: 'auto'
-                }}
-              >
-                ⚔️ ENTRAR NO ROLL20 ⚔️
-              </a>
-            )}
+
+            {/* Content Details */}
+            <div style={{
+              width: '100%',
+              background: 'rgba(0,0,0,0.4)',
+              border: '1px solid var(--border-light)',
+              borderRadius: '6px',
+              padding: '1.25rem 1.5rem',
+              color: 'var(--text-secondary)',
+              fontSize: '0.95rem',
+              lineHeight: '1.6',
+              whiteSpace: 'pre-wrap'
+            }}>
+              {latestNotification.content}
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '0.75rem', width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}>
+              {latestNotification.url ? (
+                <>
+                  <a
+                    href={latestNotification.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-occult"
+                    onClick={handleDismissNotification}
+                    style={{
+                      flex: 1,
+                      padding: '0.65rem 1.5rem',
+                      fontSize: '0.85rem',
+                      background: 'linear-gradient(135deg, var(--accent-cyan) 0%, #008b8b 100%)',
+                      color: '#000',
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      textDecoration: 'none',
+                      borderRadius: '4px',
+                      boxShadow: '0 0 15px rgba(0, 229, 255, 0.4)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.4rem',
+                      fontFamily: 'var(--font-gothic)',
+                      letterSpacing: '0.05em'
+                    }}
+                  >
+                    ⚔️ ENTRAR NO ROLL20 ⚔️
+                  </a>
+                  <button
+                    type="button"
+                    className="btn-occult-secondary"
+                    onClick={handleDismissNotification}
+                    style={{
+                      padding: '0.65rem 1.25rem',
+                      fontSize: '0.85rem',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    Fechar
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-occult"
+                  onClick={handleDismissNotification}
+                  style={{
+                    width: '100%',
+                    maxWidth: '220px',
+                    padding: '0.65rem 2rem',
+                    fontSize: '0.85rem',
+                    justifyContent: 'center',
+                    borderRadius: '4px'
+                  }}
+                >
+                  Compreendido
+                </button>
+              )}
+            </div>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
       {/* Floating Campaign Button (bottom-right) */}
       <button
