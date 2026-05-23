@@ -973,10 +973,10 @@ export default function Dashboard() {
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', borderBottom: '2px solid var(--border-crimson)', paddingBottom: '0.5rem' }}>
               {[
                 { label: 'Geral', key: 'general' },
-                { label: 'Perícias', key: 'skills' },
+                character.is_friend !== 1 && { label: 'Perícias', key: 'skills' },
                 { label: 'Combate & Equipamentos', key: 'combat' },
                 { label: 'Histórico & Dossiê', key: 'backstory' },
-              ].map((tab) => (
+              ].filter(Boolean).map((tab: any) => (
                 <button
                   key={tab.key}
                   type="button"

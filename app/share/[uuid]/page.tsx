@@ -32,7 +32,7 @@ export default function ShareSheetPage() {
         throw new Error(errData.error || 'Falha ao buscar ficha compartilhada');
       }
       const data = await res.json();
-      setCharacter(data);
+      setCharacter({ ...data, is_friend: 1 });
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Erro ao carregar a ficha pública');
@@ -59,9 +59,9 @@ export default function ShareSheetPage() {
         })
         .then((data) => {
           setCharacter((prev: any) => {
-            if (!prev) return data;
+            if (!prev) return { ...data, is_friend: 1 };
             if (prev.updated_at !== data.updated_at) {
-              return data;
+              return { ...data, is_friend: 1 };
             }
             return prev;
           });
@@ -169,36 +169,12 @@ export default function ShareSheetPage() {
       {/* Main Sheet Grid Container */}
       <main style={{ flex: 1, padding: '0 1.5rem 2rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         
-        {/* Vitals Summary Strip */}
-        <div className="vitals-grid" style={{ pointerEvents: 'none' }}>
-          <div className="vital-card hp occult-card">
-            <div className="vital-title">Pontos de Vida (PV)</div>
-            <div className="vital-value">{character.hp_current} / {character.hp_max}</div>
-            <div className="vital-bar-container">
-              <div className="vital-bar" style={{ width: `${((character.hp_current || 10) / (character.hp_max || 10)) * 100}%` }}></div>
-            </div>
-          </div>
-          <div className="vital-card mp occult-card">
-            <div className="vital-title">Pontos de Magia (PM)</div>
-            <div className="vital-value">{character.mp_current} / {character.mp_max}</div>
-            <div className="vital-bar-container">
-              <div className="vital-bar" style={{ width: `${((character.mp_current || 10) / (character.mp_max || 10)) * 100}%` }}></div>
-            </div>
-          </div>
-          <div className="vital-card san occult-card">
-            <div className="vital-title">Sanidade (SAN)</div>
-            <div className="vital-value">{character.san_current} / {character.san_max}</div>
-            <div className="vital-bar-container">
-              <div className="vital-bar" style={{ width: `${((character.san_current || 50) / (character.san_max || 99)) * 100}%` }}></div>
-            </div>
-          </div>
-        </div>
+        {/* Vitals Summary Strip - Hidden for public secret sheets to keep stats private */}
 
         {/* Tab Controls */}
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', borderBottom: '2px solid var(--border-crimson)', paddingBottom: '0.5rem' }}>
           {[
             { label: 'Geral', key: 'general' },
-            { label: 'Perícias', key: 'skills' },
             { label: 'Combate & Equipamentos', key: 'combat' },
             { label: 'Histórico & Dossiê', key: 'backstory' },
           ].map((tab) => (

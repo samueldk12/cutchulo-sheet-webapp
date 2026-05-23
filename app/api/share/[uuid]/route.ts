@@ -15,14 +15,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Ficha não compartilhada pelo jogador' }, { status: 403 });
     }
 
-    // Retrieve skills, weapons, possessions
-    const skills = await query('SELECT * FROM skills WHERE character_id = $1 ORDER BY name', [char.id]);
+    // Retrieve weapons and possessions
     const weapons = await query('SELECT * FROM weapons WHERE character_id = $1', [char.id]);
     const possessions = await query('SELECT * FROM possessions WHERE character_id = $1', [char.id]);
 
+    let returnedChar = { ...char };
+    // Redact sensitive attributes and vitals in public links as well
+    const sensitiveFields = [
+      'str', 'dex', 'int_val', 'con', 'app', 'pow', 'siz', 'edu', 'luck', 
+      'hp_current', 'hp_max', 'mp_current', 'mp_max', 'san_current', 'san_max'
+    ];
+    sensitiveFields.forEach(field => {
+      returnedChar[field] = 0;
+    });
+
     return NextResponse.json({
-      ...char,
-      skills: skills.rows,
+      ...returnedChar,
+      skills: [],
       weapons: weapons.rows,
       possessions: possessions.rows,
     });

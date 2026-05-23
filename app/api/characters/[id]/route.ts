@@ -68,10 +68,37 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     `, [characterId]);
 
     const isOwner = char.user_id === userId;
+
+    // Check if the requester is the GM of the session
+    const isGm = !!(await queryOne(`
+      SELECT sc.id 
+      FROM session_characters sc
+      JOIN sessions s ON sc.session_id = s.id
+      WHERE sc.character_id = $1 AND s.user_id = $2
+    `, [characterId, userId]));
+
+    const isFriendOrCompanion = !isOwner && !isGm;
+
+    let returnedChar = { ...char };
+    let returnedSkills = skills.rows;
+
+    if (isFriendOrCompanion) {
+      // Redact sensitive attributes and vitals
+      const sensitiveFields = [
+        'str', 'dex', 'int_val', 'con', 'app', 'pow', 'siz', 'edu', 'luck', 
+        'hp_current', 'hp_max', 'mp_current', 'mp_max', 'san_current', 'san_max'
+      ];
+      sensitiveFields.forEach(field => {
+        returnedChar[field] = 0;
+      });
+      // Clear skills
+      returnedSkills = [];
+    }
+
     return NextResponse.json({
-      ...char,
+      ...returnedChar,
       is_friend: isOwner ? 0 : 1,
-      skills: skills.rows,
+      skills: returnedSkills,
       weapons: weapons.rows,
       possessions: possessions.rows,
       spells: spells.rows,
