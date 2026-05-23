@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 
-async function checkAuth(characterId: number, userId: number): Promise<boolean> {
+async function checkAuth(characterId: number, userId: number, isWrite: boolean = false): Promise<boolean> {
   const character = await queryOne('SELECT user_id FROM characters WHERE id = $1', [characterId]);
   if (!character) return false;
   if (character.user_id === userId) return true;
@@ -13,8 +13,26 @@ async function checkAuth(characterId: number, userId: number): Promise<boolean> 
     JOIN sessions s ON sc.session_id = s.id
     WHERE sc.character_id = $1 AND s.user_id = $2
   `, [characterId, userId]);
+  if (isGmOfCharacter) return true;
 
-  return !!isGmOfCharacter;
+  // If this is a write/update operation, we restrict it to owner or GM only
+  if (isWrite) return false;
+
+  // Companion Check: Same session
+  const isCompanion = await queryOne(`
+    SELECT sc1.id
+    FROM session_characters sc1
+    JOIN session_characters sc2 ON sc1.session_id = sc2.session_id
+    JOIN characters c2 ON sc2.character_id = c2.id
+    WHERE sc1.character_id = $1 AND c2.user_id = $2
+  `, [characterId, userId]);
+  if (isCompanion) return true;
+
+  // Friend Check (added via public link)
+  const isFriend = await queryOne(`
+    SELECT id FROM friends WHERE user_id = $1 AND character_id = $2
+  `, [userId, characterId]);
+  return !!isFriend;
 }
 
 // GET /api/characters/[id]
@@ -24,7 +42,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id: paramId } = await params;
     const characterId = parseInt(paramId, 10);
 
-    const authorized = await checkAuth(characterId, userId);
+    const authorized = await checkAuth(characterId, userId, false);
     if (!authorized) {
       return NextResponse.json({ error: 'Acesso negado ou personagem não encontrado' }, { status: 403 });
     }
@@ -49,8 +67,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       LIMIT 1
     `, [characterId]);
 
+    const isOwner = char.user_id === userId;
     return NextResponse.json({
       ...char,
+      is_friend: isOwner ? 0 : 1,
       skills: skills.rows,
       weapons: weapons.rows,
       possessions: possessions.rows,
@@ -71,7 +91,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const characterId = parseInt(paramId, 10);
     const data = await request.json();
 
-    const authorized = await checkAuth(characterId, userId);
+    const authorized = await checkAuth(characterId, userId, true);
     if (!authorized) {
       return NextResponse.json({ error: 'Acesso negado ou personagem não encontrado' }, { status: 403 });
     }
@@ -125,8 +145,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const possessions = await query('SELECT * FROM possessions WHERE character_id = $1', [characterId]);
     const spells = await query('SELECT * FROM spells WHERE character_id = $1 ORDER BY name', [characterId]);
 
+    const isOwner = char.user_id === userId;
     return NextResponse.json({
       ...char,
+      is_friend: isOwner ? 0 : 1,
       skills: skills.rows,
       weapons: weapons.rows,
       possessions: possessions.rows,
