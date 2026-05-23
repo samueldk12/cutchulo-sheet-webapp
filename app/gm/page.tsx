@@ -18,6 +18,13 @@ export default function GmPanel() {
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [sessionDetails, setSessionDetails] = useState<any | null>(null);
   
+  // Lobby Navigation Tab: sessions vs npcs bestiary library
+  const [lobbyTab, setLobbyTab] = useState<'sessions' | 'npcs'>('sessions');
+
+  // Permanent NPC/Monsters bestiary library state
+  const [libraryNpcs, setLibraryNpcs] = useState<any[]>([]);
+  const [selectedLibraryNpc, setSelectedLibraryNpc] = useState<any | null>(null);
+
   // Controls
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionNotes, setNewSessionNotes] = useState('');
@@ -34,6 +41,7 @@ export default function GmPanel() {
   const [editingChar, setEditingChar] = useState<any | null>(null);
   const [gmActiveTab, setGmActiveTab] = useState<string>('general');
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isBestiaryOpen, setIsBestiaryOpen] = useState(false);
 
   // GM Dice Roller Modal State
   const [isDiceOpen, setIsDiceOpen] = useState(false);
@@ -73,11 +81,34 @@ export default function GmPanel() {
     }
   };
 
+  // Load permanent library NPCs bestiary
+  const loadLibraryNpcs = async () => {
+    try {
+      const res = await fetch('/api/npcs');
+      if (res.ok) {
+        const data = await res.json();
+        setLibraryNpcs(data);
+        if (data.length > 0 && !selectedLibraryNpc) {
+          setSelectedLibraryNpc(data[0]);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading library NPCs:', err);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       loadSessions();
+      loadLibraryNpcs();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user && lobbyTab === 'npcs') {
+      loadLibraryNpcs();
+    }
+  }, [user, lobbyTab]);
 
   // Load detailed campaign session
   const fetchSessionDetails = async (id: number, silent = false) => {
@@ -166,6 +197,33 @@ export default function GmPanel() {
     }
   };
 
+  const handleCallToRoll20 = async () => {
+    if (!selectedSessionId || !sessionDetails || !sessionDetails.roll20_url) {
+      alert('Sintonize a URL do Roll20 primeiro na barra lateral!');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: `🌌 [Roll20] **O Mestre convoca a todos para o combate!**\n\nClique no botão "Roll20" no painel de campanha ou acesse diretamente pelo portal: [Mesa de Combate no Roll20](${sessionDetails.roll20_url})`,
+          message_type: 'chat'
+        })
+      });
+
+      if (res.ok) {
+        alert('Convocação enviada com sucesso no chat e notificações dos jogadores!');
+      } else {
+        alert('Falha ao enviar convocação.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao processar convocação.');
+    }
+  };
+
   if (authLoading) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-darkest)' }}>
@@ -178,7 +236,7 @@ export default function GmPanel() {
 
   if (!user) return null;
 
-  // Actions
+  // Actions for campaign session management
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSessionName.trim()) return;
@@ -330,6 +388,48 @@ export default function GmPanel() {
     }
   };
 
+  // Fully import custom NPC or Creature from the permanent bestiary library into the active session
+  const handleImportNpcFromLibrary = async (libraryNpc: any) => {
+    if (!selectedSessionId) return;
+    try {
+      const response = await fetch(`/api/sessions/${selectedSessionId}/npc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: libraryNpc.name })
+      });
+      if (response.ok) {
+        const newSessionChar = await response.json();
+        // Fully populate character stats copied from library NPC
+        await fetch(`/api/characters/${newSessionChar.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: libraryNpc.name,
+            occupation: libraryNpc.type === 'monster' ? 'Monstro' : 'NPC',
+            player: 'NPC',
+            image: libraryNpc.image,
+            str: libraryNpc.str,
+            dex: libraryNpc.dex,
+            int_val: libraryNpc.int_val,
+            con: libraryNpc.con,
+            pow: libraryNpc.pow,
+            siz: libraryNpc.siz,
+            hp_current: libraryNpc.hp_current,
+            hp_max: libraryNpc.hp_max,
+            mp_current: libraryNpc.mp_current,
+            mp_max: libraryNpc.mp_max,
+            san_current: libraryNpc.san_current,
+            san_max: libraryNpc.san_max,
+            notes: `[Biblioteca de NPC]\n${libraryNpc.description || 'Nenhuma descrição.'}\n\nHabilidades & Ataques:\n${libraryNpc.special_abilities || 'Sem habilidades especiais.'}\n\nNotas do Escriba:\n${libraryNpc.notes || 'Sem anotações.'}\n\nArmadura: ${libraryNpc.armor || 0}`
+          })
+        });
+        fetchSessionDetails(selectedSessionId, true);
+      }
+    } catch (err) {
+      console.error('Error importing NPC from library:', err);
+    }
+  };
+
   // Sacrificar NPC (delete)
   const handleSacrificeNpc = async (charId: number) => {
     if (!confirm('Deseja mesmo sacrificar esta criatura/NPC? A ficha será apagada para sempre.')) return;
@@ -341,6 +441,125 @@ export default function GmPanel() {
     } catch (err) {
       console.error('Error sacrificing NPC:', err);
     }
+  };
+
+  // Permanent Bestiary Library actions
+  const handleCreateLibraryNpc = async () => {
+    try {
+      const res = await fetch('/api/npcs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Novo Monstro/NPC',
+          type: 'npc',
+          description: 'Nova descrição arcanas...',
+          str: 50,
+          dex: 50,
+          int_val: 50,
+          con: 50,
+          pow: 50,
+          siz: 50
+        })
+      });
+      if (res.ok) {
+        const newNpc = await res.json();
+        await loadLibraryNpcs();
+        setSelectedLibraryNpc(newNpc);
+      }
+    } catch (err) {
+      console.error('Error creating library NPC:', err);
+    }
+  };
+
+  const handleUpdateLibraryNpc = async (field: string, value: any) => {
+    if (!selectedLibraryNpc) return;
+    const updated = { ...selectedLibraryNpc, [field]: value };
+    setSelectedLibraryNpc(updated);
+
+    // Update in local list optimistically
+    setLibraryNpcs(prev => prev.map(n => n.id === selectedLibraryNpc.id ? updated : n));
+
+    try {
+      await fetch(`/api/npcs/${selectedLibraryNpc.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value })
+      });
+    } catch (err) {
+      console.error('Error updating library NPC:', err);
+    }
+  };
+
+  const handleDeleteLibraryNpc = async (id: number) => {
+    if (!confirm('Deseja mesmo sacrificar este NPC de forma permanente na sua biblioteca? Ele desaparecerá das opções de spawn.')) return;
+    try {
+      const res = await fetch(`/api/npcs/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        if (selectedLibraryNpc?.id === id) {
+          setSelectedLibraryNpc(null);
+        }
+        await loadLibraryNpcs();
+      }
+    } catch (err) {
+      console.error('Error deleting library NPC:', err);
+    }
+  };
+
+  const handleImportNpcsJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+
+        const res = await fetch('/api/npcs/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(json)
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          alert(`Sucesso! ${result.count} NPCs/Monstros importados para a biblioteca.`);
+          await loadLibraryNpcs();
+        } else {
+          const err = await res.json();
+          alert(`Falha na importação: ${err.error || 'Erro desconhecido'}`);
+        }
+      } catch (err: any) {
+        console.error('Import error:', err);
+        alert('Erro ao ler JSON: verifique a formatação do arquivo.');
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExportNpc = (npc: any) => {
+    if (!npc) return;
+    const blob = new Blob([JSON.stringify(npc, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bestiario_${npc.name.replace(/\s+/g, '_').toLowerCase()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportAllNpcs = () => {
+    if (libraryNpcs.length === 0) {
+      alert('Sua mente está vazia! Não há monstros/NPCs para exportar.');
+      return;
+    }
+    const blob = new Blob([JSON.stringify(libraryNpcs, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bestiario_completo_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // Mestre Mode character sheets manipulations
@@ -686,37 +905,96 @@ export default function GmPanel() {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleCreateSession} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', margin: '0 0.5rem 1.5rem 0.5rem' }}>
-              <span className="sidebar-item-header" style={{ margin: 0 }}>Nova Campanha</span>
-              <input
-                type="text"
-                className="gothic-input"
-                style={{ fontSize: '0.8rem', padding: '0.4rem' }}
-                placeholder="Nome da Campanha..."
-                value={newSessionName}
-                onChange={(e) => setNewSessionName(e.target.value)}
-              />
-              <input
-                type="text"
-                className="gothic-input"
-                style={{ fontSize: '0.8rem', padding: '0.4rem' }}
-                placeholder="Notas/Descrição..."
-                value={newSessionNotes}
-                onChange={(e) => setNewSessionNotes(e.target.value)}
-              />
-              <button type="submit" className="btn-occult" style={{ padding: '0.5rem', fontSize: '0.75rem', justifyContent: 'center' }}>
-                + Evocar Campanha
-              </button>
-            </form>
+            // Lobby Tab Selector (Campaigns vs NPC Library)
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', margin: '0 0.5rem 1.25rem 0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.3rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setLobbyTab('sessions')}
+                  style={{
+                    flex: 1,
+                    padding: '0.4rem',
+                    fontSize: '0.7rem',
+                    background: lobbyTab === 'sessions' ? 'rgba(229,169,59,0.15)' : 'transparent',
+                    border: '1px solid',
+                    borderColor: lobbyTab === 'sessions' ? 'var(--border-gold)' : 'transparent',
+                    color: lobbyTab === 'sessions' ? 'var(--text-gold)' : 'var(--text-muted)',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  🏰 Campanhas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLobbyTab('npcs')}
+                  style={{
+                    flex: 1,
+                    padding: '0.4rem',
+                    fontSize: '0.7rem',
+                    background: lobbyTab === 'npcs' ? 'rgba(229,169,59,0.15)' : 'transparent',
+                    border: '1px solid',
+                    borderColor: lobbyTab === 'npcs' ? 'var(--border-gold)' : 'transparent',
+                    color: lobbyTab === 'npcs' ? 'var(--text-gold)' : 'var(--text-muted)',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  🐉 Criador NPCs
+                </button>
+              </div>
+
+              {lobbyTab === 'sessions' && (
+                <form onSubmit={handleCreateSession} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <span className="sidebar-item-header" style={{ margin: 0 }}>Nova Campanha</span>
+                  <input
+                    type="text"
+                    className="gothic-input"
+                    style={{ fontSize: '0.8rem', padding: '0.4rem' }}
+                    placeholder="Nome da Campanha..."
+                    value={newSessionName}
+                    onChange={(e) => setNewSessionName(e.target.value)}
+                  />
+                  <input
+                    type="text"
+                    className="gothic-input"
+                    style={{ fontSize: '0.8rem', padding: '0.4rem' }}
+                    placeholder="Notas/Descrição..."
+                    value={newSessionNotes}
+                    onChange={(e) => setNewSessionNotes(e.target.value)}
+                  />
+                  <button type="submit" className="btn-occult" style={{ padding: '0.5rem', fontSize: '0.75rem', justifyContent: 'center' }}>
+                    + Evocar Campanha
+                  </button>
+                </form>
+              )}
+
+              {lobbyTab === 'npcs' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <span className="sidebar-item-header" style={{ margin: 0 }}>Biblioteca</span>
+                  <button
+                    type="button"
+                    className="btn-occult"
+                    onClick={handleCreateLibraryNpc}
+                    style={{ padding: '0.5rem', fontSize: '0.75rem', justifyContent: 'center', background: 'rgba(0, 229, 255, 0.05)', borderColor: 'var(--accent-cyan)' }}
+                  >
+                    🐉 + Criar NPC/Monstro
+                  </button>
+                </div>
+              )}
+            </div>
           )}
 
+          {/* Render Active Campaigns List */}
           <div className="sidebar-item-header">Suas Campanhas Ativas</div>
           <div className="gm-session-list">
             {sessions.map(s => (
               <div
                 key={s.id}
                 className={`gm-session-card glass-panel ${selectedSessionId === s.id ? 'active' : ''}`}
-                style={{ padding: '0.75rem', border: '1px solid var(--border-light)' }}
+                style={{ padding: '0.75rem', border: '1px solid var(--border-light)', cursor: 'pointer' }}
                 onClick={() => setSelectedSessionId(s.id)}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -778,29 +1056,126 @@ export default function GmPanel() {
                 </p>
               </div>
 
-              {sessionDetails.roll20_url && (
-                <a
-                  href={sessionDetails.roll20_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-occult"
-                  style={{
-                    padding: '0.5rem 1rem',
-                    fontSize: '0.8rem',
-                    textDecoration: 'none',
-                    background: 'linear-gradient(135deg, var(--accent-gold) 0%, #b8860b 100%)',
-                    color: '#000',
-                    fontWeight: 'bold',
-                    boxShadow: '0 0 10px rgba(229, 169, 59, 0.3)',
-                    borderRadius: '4px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  ⚔️ Abrir Mesa Roll20 ↗
-                </a>
+              {!sessionDetails.roll20_url ? (
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    className="gothic-input"
+                    placeholder="Sintonizar URL do Roll20..."
+                    value={roll20Input}
+                    onChange={(e) => setRoll20Input(e.target.value)}
+                    style={{ fontSize: '0.75rem', padding: '0.4rem 0.6rem', width: '220px', margin: 0 }}
+                  />
+                  <button
+                    type="button"
+                    className="btn-occult"
+                    onClick={handleUpdateRoll20Url}
+                    style={{
+                      padding: '0.4rem 0.8rem',
+                      fontSize: '0.75rem',
+                      background: 'var(--accent-gold)',
+                      color: '#000',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      height: '34px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
+                    }}
+                  >
+                    🌌 Sintonizar
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <a
+                    href={sessionDetails.roll20_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-occult"
+                    style={{
+                      padding: '0.5rem 1rem',
+                      fontSize: '0.8rem',
+                      textDecoration: 'none',
+                      background: 'linear-gradient(135deg, var(--accent-gold) 0%, #b8860b 100%)',
+                      color: '#000',
+                      fontWeight: 'bold',
+                      boxShadow: '0 0 10px rgba(229, 169, 59, 0.3)',
+                      borderRadius: '4px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    ⚔️ Abrir Mesa Roll20 ↗
+                  </a>
+                  <button
+                    type="button"
+                    className="btn-occult"
+                    onClick={handleCallToRoll20}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      fontSize: '0.8rem',
+                      background: 'linear-gradient(135deg, var(--accent-cyan) 0%, #008b8b 100%)',
+                      border: '1.5px solid var(--accent-cyan)',
+                      color: '#000',
+                      fontWeight: 'bold',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      boxShadow: '0 0 10px rgba(0, 243, 255, 0.2)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      whiteSpace: 'nowrap'
+                    }}
+                    title="Convocação e portal místico Roll20 para todos os investigadores"
+                  >
+                    🌌 Chamar para o Roll20
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-occult"
+                    onClick={() => {
+                      if (confirm('Deseja desvincular ou alterar a URL do Roll20?')) {
+                        setRoll20Input('');
+                        fetch(`/api/sessions/${selectedSessionId}`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            name: sessionDetails.name,
+                            notes: sessionDetails.notes,
+                            roll20_url: '',
+                            is_active: sessionDetails.is_active
+                          })
+                        }).then(r => {
+                          if (r.ok) {
+                            setSessionDetails((prev: any) => ({ ...prev, roll20_url: '' }));
+                          }
+                        });
+                      }
+                    }}
+                    style={{
+                      padding: '0.5rem',
+                      fontSize: '0.8rem',
+                      background: 'transparent',
+                      border: '1px solid var(--border-light)',
+                      color: 'var(--text-muted)',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '34px',
+                      width: '34px'
+                    }}
+                    title="Desvincular ou alterar Portal Roll20"
+                  >
+                    ⚙️
+                  </button>
+                </div>
               )}
             </div>
 
@@ -825,19 +1200,80 @@ export default function GmPanel() {
                   </div>
                 </div>
 
-                {/* Instant NPC Spawner */}
-                <form onSubmit={handleSpawnNpcDirect} className="glass-panel" style={{ display: 'flex', gap: '0.5rem', padding: '0.6rem 1rem', alignItems: 'center' }}>
-                  <span className="gothic-label" style={{ fontSize: '0.75rem', color: 'var(--text-gold)', flexShrink: 0 }}>+ Evocar Monstro/NPC:</span>
-                  <input
-                    type="text"
-                    className="gothic-input"
-                    placeholder="Nome da Criatura... (Ex: Ghoul, Cultista)"
-                    value={newNpcName}
-                    onChange={(e) => setNewNpcName(e.target.value)}
-                    style={{ fontSize: '0.8rem', padding: '0.35rem', flex: 1 }}
-                  />
-                  <button type="submit" className="btn-occult" style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem' }}>Spawn ⛧</button>
-                </form>
+                {/* Instant NPC Spawner & Library Importer */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem' }} className="gm-spawners-grid">
+                    {/* Spawner Manual */}
+                    <form onSubmit={handleSpawnNpcDirect} className="glass-panel" style={{ display: 'flex', gap: '0.5rem', padding: '0.6rem 1rem', alignItems: 'center' }}>
+                      <span className="gothic-label" style={{ fontSize: '0.7rem', color: 'var(--text-gold)', flexShrink: 0 }}>+ Evocar:</span>
+                      <input
+                        type="text"
+                        className="gothic-input"
+                        placeholder="Nome do Monstro/NPC..."
+                        value={newNpcName}
+                        onChange={(e) => setNewNpcName(e.target.value)}
+                        style={{ fontSize: '0.8rem', padding: '0.35rem', flex: 1 }}
+                      />
+                      <button type="submit" className="btn-occult" style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem' }}>Spawn</button>
+                    </form>
+
+                    {/* Importer from Library */}
+                    <div className="glass-panel" style={{ display: 'flex', gap: '0.5rem', padding: '0.6rem 1rem', alignItems: 'center' }}>
+                      <span className="gothic-label" style={{ fontSize: '0.7rem', color: 'var(--accent-cyan)', flexShrink: 0 }}>📥 Biblioteca:</span>
+                      <select
+                        className="gothic-select"
+                        style={{ fontSize: '0.8rem', padding: '0.35rem', flex: 1, background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border-light)' }}
+                        defaultValue=""
+                        onChange={async (e) => {
+                          const val = e.target.value;
+                          if (!val) return;
+                          const libraryNpc = libraryNpcs.find(n => n.id === parseInt(val, 10));
+                          if (libraryNpc) {
+                            await handleImportNpcFromLibrary(libraryNpc);
+                          }
+                          e.target.value = ""; // Reset dropdown selection
+                        }}
+                      >
+                        <option value="" disabled>Escolha para evocar...</option>
+                        {libraryNpcs.map(n => (
+                          <option key={n.id} value={n.id}>
+                            {n.type === 'monster' ? '👻' : '👤'} {n.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Quick button to open Library/Bestiary Manager */}
+                  <button
+                    type="button"
+                    className="btn-occult"
+                    onClick={() => {
+                      loadLibraryNpcs();
+                      setIsBestiaryOpen(true);
+                    }}
+                    style={{
+                      padding: '0.5rem 1.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      border: '1px solid var(--accent-cyan)',
+                      background: 'rgba(0, 229, 255, 0.04)',
+                      color: 'var(--accent-cyan)',
+                      fontSize: '0.8rem',
+                      fontWeight: 'bold',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      boxShadow: '0 0 10px rgba(0, 229, 255, 0.1)',
+                      width: '100%',
+                      fontFamily: 'var(--font-gothic)',
+                      letterSpacing: '0.05em'
+                    }}
+                  >
+                    🐉 ABRIR CRIADOR & BIBLIOTECA DE NPCs / CRIATURAS 🐉
+                  </button>
+                </div>
 
                 {/* PC and NPC List Stacked */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -1240,14 +1676,263 @@ export default function GmPanel() {
             </div>
           </>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, alignItems: 'center', justifyContent: 'center', gap: '1.5rem', color: 'var(--text-muted)' }}>
-            <span style={{ fontSize: '6rem', textShadow: 'var(--glow-cyan)' }}>🔮</span>
-            <h2 style={{ fontFamily: 'var(--font-gothic)', color: 'var(--text-gold)', fontSize: '1.8rem', textAlign: 'center' }}>
-              Trono do Mestre da Campanha
-            </h2>
-            <p style={{ maxWidth: '480px', textAlign: 'center', fontSize: '0.9rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
-              Selecione uma campanha existente na barra sinistra ou invoque uma nova preenchendo o formulário. O código de entrada permitirá que seus jogadores participem da sessão.
-            </p>
+          // Lobby View: Campaigns tab vs permanent NPCs catalog bestiary library
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {lobbyTab === 'sessions' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', color: 'var(--text-muted)', minHeight: '60vh', textAlign: 'center' }}>
+                <span style={{ fontSize: '6.5rem', textShadow: 'var(--glow-cyan)' }}>🔮</span>
+                <h2 style={{ fontFamily: 'var(--font-gothic)', color: 'var(--text-gold)', fontSize: '1.8rem' }}>
+                  Trono do Mestre da Campanha
+                </h2>
+                <p style={{ maxWidth: '520px', margin: '0 auto', fontSize: '0.9rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                  Selecione uma campanha existente na barra sinistra ou invoque uma nova preenchendo o formulário de evocações. O código de entrada permitirá que seus jogadores conectem as fichas à sua mesa.
+                </p>
+              </div>
+            ) : (
+              // Permanent NPC/Criaturas Bestiary Catalog & Editor
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
+                  <h2 style={{ fontFamily: 'var(--font-gothic)', color: 'var(--accent-cyan)', fontSize: '1.6rem', margin: 0 }}>
+                    🐉 Grimório de Monstros & Criaturas
+                  </h2>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button type="button" className="btn-occult" onClick={handleCreateLibraryNpc} style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}>
+                      🐉 + Novo NPC / Monstro
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn-occult-secondary" 
+                      onClick={() => document.getElementById('lobby-npc-import-input')?.click()} 
+                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem', border: '1px solid var(--accent-cyan)', color: 'var(--accent-cyan)' }}
+                    >
+                      📤 Importar JSON
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn-occult-secondary" 
+                      onClick={handleExportAllNpcs} 
+                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem', border: '1px solid var(--text-gold)', color: 'var(--text-gold)' }}
+                    >
+                      📥 Exportar Todos
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '1.5rem' }} className="gm-npc-library-grid">
+                  {/* Sidebar list of NPCs */}
+                  <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '70vh', overflowY: 'auto' }}>
+                    <span className="gothic-label" style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Biblioteca do Grimório</span>
+                    {libraryNpcs.map(npc => (
+                      <div
+                        key={npc.id}
+                        onClick={() => setSelectedLibraryNpc(npc)}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '0.6rem 0.8rem',
+                          background: selectedLibraryNpc?.id === npc.id ? 'rgba(0, 229, 255, 0.08)' : 'rgba(0,0,0,0.25)',
+                          border: selectedLibraryNpc?.id === npc.id ? '1px solid var(--accent-cyan)' : '1px solid rgba(255,255,255,0.03)',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: selectedLibraryNpc?.id === npc.id ? 'var(--text-primary)' : 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{npc.name}</span>
+                          <span style={{ fontSize: '0.65rem', color: npc.type === 'monster' ? 'var(--text-crimson)' : 'var(--text-muted)' }}>
+                            {npc.type === 'monster' ? '👻 Criatura / Monstro' : '👤 NPC / Aliado'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="vital-btn"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteLibraryNpc(npc.id); }}
+                          style={{ color: 'var(--text-crimson)', padding: '0.2rem', fontSize: '0.75rem' }}
+                          title="Sacrificar da biblioteca"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {libraryNpcs.length === 0 && (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textAlign: 'center', padding: '2rem 0' }}>Sem monstros guardados na mente.</span>
+                    )}
+                  </div>
+
+                  {/* Main Editor Details Panel */}
+                  {selectedLibraryNpc ? (
+                    <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed rgba(255,255,255,0.05)', paddingBottom: '0.4rem' }}>
+                        <span className="gothic-label" style={{ fontSize: '0.65rem', color: 'var(--accent-cyan)', margin: 0 }}>⛧ EDITOR MÍSTICO ⛧</span>
+                        <button
+                          type="button"
+                          className="btn-occult-secondary"
+                          onClick={() => handleExportNpc(selectedLibraryNpc)}
+                          style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', border: '1px solid var(--border-gold)', color: 'var(--text-gold)' }}
+                        >
+                          📥 Exportar Ficha (JSON)
+                        </button>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr', gap: '1rem' }}>
+                        <div className="gothic-input-group">
+                          <label className="gothic-label">Nome da Criatura / NPC</label>
+                          <input
+                            type="text"
+                            className="gothic-input"
+                            value={selectedLibraryNpc.name || ''}
+                            onChange={(e) => handleUpdateLibraryNpc('name', e.target.value)}
+                            style={{ fontSize: '0.95rem' }}
+                          />
+                        </div>
+                        <div className="gothic-input-group">
+                          <label className="gothic-label">Tipo de Entidade</label>
+                          <select
+                            className="gothic-select"
+                            value={selectedLibraryNpc.type}
+                            onChange={(e) => handleUpdateLibraryNpc('type', e.target.value)}
+                            style={{ padding: '0.55rem', fontSize: '0.85rem' }}
+                          >
+                            <option value="npc">👤 NPC Humano (Aliado/Inimigo)</option>
+                            <option value="monster">👻 Criatura / Monstro Cósmico</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Attributes grid */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <span className="gothic-label" style={{ fontSize: '0.7rem', color: 'var(--text-gold)' }}>Atributos Físicos e Mentais</span>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.5rem' }}>
+                          {[
+                            { label: 'FOR', key: 'str' },
+                            { label: 'DES', key: 'dex' },
+                            { label: 'INT', key: 'int_val' },
+                            { label: 'CON', key: 'con' },
+                            { label: 'POD', key: 'pow' },
+                            { label: 'TAM', key: 'siz' },
+                          ].map(attr => (
+                            <div key={attr.key} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block' }}>{attr.label}</span>
+                              <input
+                                type="number"
+                                className="gothic-input"
+                                style={{ background: 'transparent', border: 'none', textAlign: 'center', fontWeight: 'bold', width: '100%', fontSize: '1rem', color: 'var(--text-gold)', padding: 0 }}
+                                value={selectedLibraryNpc[attr.key] || 50}
+                                onChange={(e) => handleUpdateLibraryNpc(attr.key, parseInt(e.target.value, 10) || 0)}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Vitals & Combat */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                        <div className="gothic-input-group">
+                          <label className="gothic-label">Vida Máxima (PV)</label>
+                          <input
+                            type="number"
+                            className="gothic-input"
+                            value={selectedLibraryNpc.hp_max || 10}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10) || 0;
+                              handleUpdateLibraryNpc('hp_max', val);
+                              handleUpdateLibraryNpc('hp_current', val);
+                            }}
+                          />
+                        </div>
+                        <div className="gothic-input-group">
+                          <label className="gothic-label">Magia Máxima (PM)</label>
+                          <input
+                            type="number"
+                            className="gothic-input"
+                            value={selectedLibraryNpc.mp_max || 10}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10) || 0;
+                              handleUpdateLibraryNpc('mp_max', val);
+                              handleUpdateLibraryNpc('mp_current', val);
+                            }}
+                          />
+                        </div>
+                        <div className="gothic-input-group">
+                          <label className="gothic-label">Armadura (Redução Fís.)</label>
+                          <input
+                            type="number"
+                            className="gothic-input"
+                            value={selectedLibraryNpc.armor || 0}
+                            onChange={(e) => handleUpdateLibraryNpc('armor', parseInt(e.target.value, 10) || 0)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Photo Url */}
+                      <div className="gothic-input-group">
+                        <label className="gothic-label">Link de Foto do Monstro / NPC</label>
+                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            className="gothic-input"
+                            placeholder="URL da Imagem da Web..."
+                            value={selectedLibraryNpc.image || ''}
+                            onChange={(e) => handleUpdateLibraryNpc('image', e.target.value)}
+                            style={{ flex: 1 }}
+                          />
+                          {selectedLibraryNpc.image && (
+                            <span style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '4px',
+                              border: '1px solid var(--border-gold)',
+                              background: `url(${selectedLibraryNpc.image}) center/cover no-repeat`,
+                              flexShrink: 0
+                            }} />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Description & Attacks */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div className="gothic-input-group">
+                          <label className="gothic-label">Habilidades Especiais & Ataques</label>
+                          <textarea
+                            className="gothic-input"
+                            placeholder="Descreva as garras, presas, tentáculos ou feitiços que a criatura desfere..."
+                            value={selectedLibraryNpc.special_abilities || ''}
+                            onChange={(e) => handleUpdateLibraryNpc('special_abilities', e.target.value)}
+                            style={{ height: '100px', resize: 'vertical', fontSize: '0.8rem' }}
+                          />
+                        </div>
+                        <div className="gothic-input-group">
+                          <label className="gothic-label">Notas e Comportamentos</label>
+                          <textarea
+                            className="gothic-input"
+                            placeholder="Notas de mistério, fraquezas ou táticas arcanas do mestre..."
+                            value={selectedLibraryNpc.notes || ''}
+                            onChange={(e) => handleUpdateLibraryNpc('notes', e.target.value)}
+                            style={{ height: '100px', resize: 'vertical', fontSize: '0.8rem' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="gothic-input-group">
+                        <label className="gothic-label">Dossiê e Descrição Biográfica</label>
+                        <textarea
+                          className="gothic-input"
+                          placeholder="Uma breve introdução descritiva para narrar na mesa..."
+                          value={selectedLibraryNpc.description || ''}
+                          onChange={(e) => handleUpdateLibraryNpc('description', e.target.value)}
+                          style={{ height: '80px', resize: 'vertical', fontSize: '0.8rem' }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '6rem 2rem', border: '1px dashed var(--border-light)', borderRadius: '8px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
+                      <span style={{ fontSize: '3rem' }}>🐉</span>
+                      <span>Selecione uma criatura arcanas na barra esquerda ou evoque um novo NPC para moldar seus atributos e ataques permanentemente.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -1344,6 +2029,290 @@ export default function GmPanel() {
           </div>
         </div>
       )}
+
+      {/* GM NPC LIBRARY & CREATOR MODAL */}
+      {isBestiaryOpen && (
+        <div className="occult-modal-overlay">
+          <div className="occult-modal" style={{ maxWidth: '1100px', width: '95%' }}>
+            
+            {/* Modal Header */}
+            <div className="occult-modal-header" style={{ borderBottomColor: 'var(--border-cyan)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--accent-cyan)' }}>Grimório de Monstros & Criaturas</span>
+                <h3 style={{ margin: 0, color: 'var(--text-gold)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  🐉 Biblioteca e Criador de NPCs
+                </h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setIsBestiaryOpen(false)}>×</button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="occult-modal-content" style={{ maxHeight: '70vh', overflowY: 'auto', padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Gerenciamento de Modelos da Mesa</span>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button type="button" className="btn-occult" onClick={handleCreateLibraryNpc} style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem', borderColor: 'var(--accent-cyan)' }}>
+                    🐉 + Criar Novo
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn-occult-secondary" 
+                    onClick={() => document.getElementById('modal-npc-import-input')?.click()} 
+                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem', border: '1px solid var(--accent-cyan)', color: 'var(--accent-cyan)' }}
+                  >
+                    📤 Importar JSON
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn-occult-secondary" 
+                    onClick={handleExportAllNpcs} 
+                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem', border: '1px solid var(--text-gold)', color: 'var(--text-gold)' }}
+                  >
+                    📥 Exportar Todos
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '1.5rem' }} className="gm-npc-library-grid">
+                {/* Sidebar list of NPCs */}
+                <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '50vh', overflowY: 'auto' }}>
+                  <span className="gothic-label" style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Seus Modelos Guardados</span>
+                  {libraryNpcs.map(npc => (
+                    <div
+                      key={npc.id}
+                      onClick={() => setSelectedLibraryNpc(npc)}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '0.6rem 0.8rem',
+                        background: selectedLibraryNpc?.id === npc.id ? 'rgba(0, 229, 255, 0.08)' : 'rgba(0,0,0,0.25)',
+                        border: selectedLibraryNpc?.id === npc.id ? '1px solid var(--accent-cyan)' : '1px solid rgba(255,255,255,0.03)',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: selectedLibraryNpc?.id === npc.id ? 'var(--text-primary)' : 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{npc.name}</span>
+                        <span style={{ fontSize: '0.65rem', color: npc.type === 'monster' ? 'var(--text-crimson)' : 'var(--text-muted)' }}>
+                          {npc.type === 'monster' ? '👻 Criatura' : '👤 NPC'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="vital-btn"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteLibraryNpc(npc.id); }}
+                        style={{ color: 'var(--text-crimson)', padding: '0.2rem', fontSize: '0.75rem' }}
+                        title="Sacrificar da biblioteca"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {libraryNpcs.length === 0 && (
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textAlign: 'center', padding: '2rem 0' }}>Sem monstros guardados na mente.</span>
+                  )}
+                </div>
+
+                {/* Main Editor Details Panel */}
+                {selectedLibraryNpc ? (
+                  <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed rgba(255,255,255,0.05)', paddingBottom: '0.4rem' }}>
+                      <span className="gothic-label" style={{ fontSize: '0.65rem', color: 'var(--accent-cyan)', margin: 0 }}>⛧ EDITOR MÍSTICO ⛧</span>
+                      <button
+                        type="button"
+                        className="btn-occult-secondary"
+                        onClick={() => handleExportNpc(selectedLibraryNpc)}
+                        style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', border: '1px solid var(--border-gold)', color: 'var(--text-gold)' }}
+                      >
+                        📥 Exportar Ficha (JSON)
+                      </button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr', gap: '1rem' }}>
+                      <div className="gothic-input-group">
+                        <label className="gothic-label">Nome da Criatura / NPC</label>
+                        <input
+                          type="text"
+                          className="gothic-input"
+                          value={selectedLibraryNpc.name || ''}
+                          onChange={(e) => handleUpdateLibraryNpc('name', e.target.value)}
+                          style={{ fontSize: '0.95rem' }}
+                        />
+                      </div>
+                      <div className="gothic-input-group">
+                        <label className="gothic-label">Tipo de Entidade</label>
+                        <select
+                          className="gothic-select"
+                          value={selectedLibraryNpc.type}
+                          onChange={(e) => handleUpdateLibraryNpc('type', e.target.value)}
+                          style={{ padding: '0.55rem', fontSize: '0.85rem' }}
+                        >
+                          <option value="npc">👤 NPC Humano (Aliado/Inimigo)</option>
+                          <option value="monster">👻 Criatura / Monstro Cósmico</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Attributes grid */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                      <span className="gothic-label" style={{ fontSize: '0.7rem', color: 'var(--text-gold)' }}>Atributos Físicos e Mentais</span>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.5rem' }}>
+                        {[
+                          { label: 'FOR', key: 'str' },
+                          { label: 'DES', key: 'dex' },
+                          { label: 'INT', key: 'int_val' },
+                          { label: 'CON', key: 'con' },
+                          { label: 'POD', key: 'pow' },
+                          { label: 'TAM', key: 'siz' },
+                        ].map(attr => (
+                          <div key={attr.key} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-light)', borderRadius: '6px', padding: '0.4rem', textAlign: 'center' }}>
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block' }}>{attr.label}</span>
+                            <input
+                              type="number"
+                              className="gothic-input"
+                              style={{ background: 'transparent', border: 'none', textAlign: 'center', fontWeight: 'bold', width: '100%', fontSize: '1rem', color: 'var(--text-gold)', padding: 0 }}
+                              value={selectedLibraryNpc[attr.key] || 50}
+                              onChange={(e) => handleUpdateLibraryNpc(attr.key, parseInt(e.target.value, 10) || 0)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Vitals & Combat */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                      <div className="gothic-input-group">
+                        <label className="gothic-label">Vida Máxima (PV)</label>
+                        <input
+                          type="number"
+                          className="gothic-input"
+                          value={selectedLibraryNpc.hp_max || 10}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10) || 0;
+                            handleUpdateLibraryNpc('hp_max', val);
+                            handleUpdateLibraryNpc('hp_current', val);
+                          }}
+                        />
+                      </div>
+                      <div className="gothic-input-group">
+                        <label className="gothic-label">Magia Máxima (PM)</label>
+                        <input
+                          type="number"
+                          className="gothic-input"
+                          value={selectedLibraryNpc.mp_max || 10}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10) || 0;
+                            handleUpdateLibraryNpc('mp_max', val);
+                            handleUpdateLibraryNpc('mp_current', val);
+                          }}
+                        />
+                      </div>
+                      <div className="gothic-input-group">
+                        <label className="gothic-label">Armadura (Redução Fís.)</label>
+                        <input
+                          type="number"
+                          className="gothic-input"
+                          value={selectedLibraryNpc.armor || 0}
+                          onChange={(e) => handleUpdateLibraryNpc('armor', parseInt(e.target.value, 10) || 0)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Photo Url */}
+                    <div className="gothic-input-group">
+                      <label className="gothic-label">Link de Foto do Monstro / NPC</label>
+                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          className="gothic-input"
+                          placeholder="URL da Imagem da Web..."
+                          value={selectedLibraryNpc.image || ''}
+                          onChange={(e) => handleUpdateLibraryNpc('image', e.target.value)}
+                          style={{ flex: 1 }}
+                        />
+                        {selectedLibraryNpc.image && (
+                          <span style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '4px',
+                            border: '1px solid var(--border-gold)',
+                            background: `url(${selectedLibraryNpc.image}) center/cover no-repeat`,
+                            flexShrink: 0
+                          }} />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Description & Attacks */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div className="gothic-input-group">
+                        <label className="gothic-label">Habilidades Especiais & Ataques</label>
+                        <textarea
+                          className="gothic-input"
+                          placeholder="Descreva as garras, presas, tentáculos ou feitiços que a criatura desfere..."
+                          value={selectedLibraryNpc.special_abilities || ''}
+                          onChange={(e) => handleUpdateLibraryNpc('special_abilities', e.target.value)}
+                          style={{ height: '100px', resize: 'vertical', fontSize: '0.8rem' }}
+                        />
+                      </div>
+                      <div className="gothic-input-group">
+                        <label className="gothic-label">Notas e Comportamentos</label>
+                        <textarea
+                          className="gothic-input"
+                          placeholder="Notas de mistério, fraquezas ou táticas arcanas do mestre..."
+                          value={selectedLibraryNpc.notes || ''}
+                          onChange={(e) => handleUpdateLibraryNpc('notes', e.target.value)}
+                          style={{ height: '100px', resize: 'vertical', fontSize: '0.8rem' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="gothic-input-group">
+                      <label className="gothic-label">Dossiê e Descrição Biográfica</label>
+                      <textarea
+                        className="gothic-input"
+                        placeholder="Uma breve introdução descritiva para narrar na mesa..."
+                        value={selectedLibraryNpc.description || ''}
+                        onChange={(e) => handleUpdateLibraryNpc('description', e.target.value)}
+                        style={{ height: '80px', resize: 'vertical', fontSize: '0.8rem' }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '6rem 2rem', border: '1px dashed var(--border-light)', borderRadius: '8px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
+                    <span style={{ fontSize: '3rem' }}>🐉</span>
+                    <span>Selecione uma criatura arcanas na barra esquerda ou evoque um novo NPC para moldar seus atributos e ataques permanentemente.</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="occult-modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px dashed var(--border-light)', padding: '1.5rem' }}>
+              <button type="button" className="btn-occult" onClick={() => setIsBestiaryOpen(false)}>
+                Concluído
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Hidden file inputs for JSON import */}
+      <input
+        type="file"
+        id="lobby-npc-import-input"
+        style={{ display: 'none' }}
+        accept=".json"
+        onChange={handleImportNpcsJson}
+      />
+      <input
+        type="file"
+        id="modal-npc-import-input"
+        style={{ display: 'none' }}
+        accept=".json"
+        onChange={handleImportNpcsJson}
+      />
 
       {/* GM dice roller modal */}
       <DiceRollerModal

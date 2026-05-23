@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const userId = parseInt(request.headers.get('x-user-id')!, 10);
     const result = await query(
-      `SELECT id, name, type, description, hp_current, hp_max, mp_current, mp_max, san_current, san_max, armor, image, created_at
+      `SELECT *
        FROM npcs
        WHERE user_id = $1
        ORDER BY type, name`,

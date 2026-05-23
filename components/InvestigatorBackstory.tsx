@@ -12,6 +12,29 @@ export default function InvestigatorBackstory({
   onChange
 }: InvestigatorBackstoryProps) {
   
+  const isFriend = character?.is_friend === 1;
+
+  if (isFriend) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
+          <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <label className="gothic-label" style={{ color: 'var(--text-gold)', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.25rem' }}>
+              Descrição Pessoal
+            </label>
+            <textarea
+              className="gothic-input"
+              style={{ minHeight: '180px', background: 'rgba(0,0,0,0.3)', resize: 'vertical', fontSize: '0.85rem', lineHeight: '1.4' }}
+              placeholder="Nenhuma descrição pessoal registrada."
+              value={character.appearance_desc || ''}
+              readOnly
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const textareas = [
     { label: 'Descrição Pessoal', key: 'appearance_desc', placeholder: 'Aparência, estilo de se vestir, traços característicos...' },
     { label: 'Ideologia & Crenças', key: 'ideology', placeholder: 'Suas convicções espirituais ou filosóficas, atitude perante a vida...' },

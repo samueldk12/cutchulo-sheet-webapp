@@ -33,6 +33,8 @@ export default function FloatingCampaignDrawer({
   const [chatInput, setChatInput] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const lastMessageIdRef = useRef<number | null>(null);
+  const [whisperRecipientId, setWhisperRecipientId] = useState<number | null>(null);
+  const [participants, setParticipants] = useState<any[]>([]);
 
   // Spells States
   const [spells, setSpells] = useState<Spell[]>([]);
@@ -107,6 +109,7 @@ export default function FloatingCampaignDrawer({
                   // Add notification toast
                   let toastTitle = `Mensagem de ${msg.sender_username}`;
                   let toastContent = msg.content;
+                  let toastUrl = '';
 
                   if (msg.message_type === 'roll' && msg.roll_details) {
                     const d = msg.roll_details;
@@ -114,13 +117,23 @@ export default function FloatingCampaignDrawer({
                     toastContent = `Rolou ${d.expression}: resultado ${d.total}`;
                   } else if (msg.content.includes('[Grimório]')) {
                     toastTitle = `🔮 Magia Conjurada!`;
+                  } else if (msg.content.includes('[Roll20]')) {
+                    toastTitle = `🌌 Convite para o Roll20!`;
+                    toastContent = `O Mestre convoca todos para a mesa de combate!`;
+                    const match = msg.content.match(/\((https?:\/\/[^\)]+)\)/);
+                    if (match) {
+                      toastUrl = match[1];
+                    } else if (character?.session?.roll20_url) {
+                      toastUrl = character.session.roll20_url;
+                    }
                   }
 
                   const newToast = {
                     id: Date.now() + Math.random(),
                     title: toastTitle,
                     content: toastContent,
-                    type: msg.message_type
+                    type: msg.message_type,
+                    url: toastUrl
                   };
 
                   setToasts(prev => [...prev, newToast]);
@@ -164,6 +177,28 @@ export default function FloatingCampaignDrawer({
       setUnreadCount(0);
     }
   }, [isOpen, activeTab]);
+
+  // Load session participants (characters with their owners) for whispering
+  const loadParticipants = async () => {
+    if (!sessionId) return;
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`);
+      if (res.ok) {
+        const data = await res.json();
+        // We only want actual player characters with active owner_id, excluding GM mock character
+        const pcs = (data.characters || []).filter((c: any) => c.player !== 'NPC' && c.owner_id);
+        setParticipants(pcs);
+      }
+    } catch (err) {
+      console.error('Error loading session participants:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && sessionId && character?.id === -999) {
+      loadParticipants();
+    }
+  }, [isOpen, sessionId, character?.id]);
 
   if (!sessionId) return null;
 
@@ -354,13 +389,18 @@ export default function FloatingCampaignDrawer({
     }
 
     try {
+      const payload: any = {
+        content: input,
+        message_type: whisperRecipientId ? 'whisper' : 'chat'
+      };
+      if (whisperRecipientId) {
+        payload.recipient_id = whisperRecipientId;
+      }
+
       const res = await fetch(`/api/sessions/${sessionId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: input,
-          message_type: 'chat'
-        })
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
@@ -526,22 +566,25 @@ export default function FloatingCampaignDrawer({
             key={t.id}
             style={{
               background: 'rgba(12, 12, 20, 0.95)',
-              borderLeft: t.type === 'roll' ? '4px solid var(--accent-cyan)' : '4px solid var(--primary-crimson)',
+              borderLeft: t.type === 'roll' || t.title.includes('Roll20') ? '4px solid var(--accent-cyan)' : '4px solid var(--primary-crimson)',
               borderTop: '1px solid rgba(255,255,255,0.05)',
               borderBottom: '1px solid rgba(255,255,255,0.05)',
               borderRight: '1px solid rgba(255,255,255,0.05)',
               borderRadius: '0 6px 6px 0',
               padding: '0.75rem 1rem',
-              boxShadow: t.type === 'roll' ? '0 4px 15px rgba(0, 229, 255, 0.15)' : '0 4px 15px rgba(140, 12, 16, 0.25)',
+              boxShadow: t.type === 'roll' || t.title.includes('Roll20') ? '0 4px 15px rgba(0, 229, 255, 0.25)' : '0 4px 15px rgba(140, 12, 16, 0.25)',
               color: '#fff',
               fontSize: '0.85rem',
               transition: 'all 0.3s ease',
               animation: 'slideInRight 0.3s ease-out',
               backdropFilter: 'blur(8px)',
-              pointerEvents: 'auto'
+              pointerEvents: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.35rem'
             }}
           >
-            <div style={{ fontWeight: 'bold', color: t.type === 'roll' ? 'var(--accent-cyan)' : 'var(--text-gold)', marginBottom: '0.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontWeight: 'bold', color: t.type === 'roll' || t.title.includes('Roll20') ? 'var(--accent-cyan)' : 'var(--text-gold)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>{t.title}</span>
               <button 
                 onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
@@ -553,6 +596,34 @@ export default function FloatingCampaignDrawer({
             <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
               {t.content}
             </div>
+            {t.url && (
+              <a
+                href={t.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-occult"
+                style={{
+                  marginTop: '0.4rem',
+                  padding: '0.4rem 0.8rem',
+                  fontSize: '0.7rem',
+                  background: 'linear-gradient(135deg, var(--accent-cyan) 0%, #008b8b 100%)',
+                  color: '#000',
+                  fontWeight: 'bold',
+                  textAlign: 'center',
+                  textDecoration: 'none',
+                  borderRadius: '4px',
+                  boxShadow: '0 0 10px rgba(0, 229, 255, 0.3)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.25rem',
+                  fontFamily: 'var(--font-gothic)',
+                  pointerEvents: 'auto'
+                }}
+              >
+                ⚔️ ENTRAR NO ROLL20 ⚔️
+              </a>
+            )}
           </div>
         ))}
       </div>
@@ -574,7 +645,7 @@ export default function FloatingCampaignDrawer({
           fontSize: '1.6rem',
           cursor: 'pointer',
           boxShadow: '0 4px 20px rgba(140, 12, 16, 0.6), 0 0 10px rgba(229, 169, 59, 0.3)',
-          display: 'flex',
+          display: isOpen ? 'none' : 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 999,
@@ -727,6 +798,7 @@ export default function FloatingCampaignDrawer({
                     {chatMessages.map(msg => {
                       const isMine = currentUser && msg.sender_id === currentUser.id;
                       const isRoll = msg.message_type === 'roll';
+                      const isWhisper = msg.message_type === 'whisper';
 
                       return (
                         <div
@@ -734,17 +806,31 @@ export default function FloatingCampaignDrawer({
                           style={{
                             alignSelf: isMine ? 'flex-end' : 'flex-start',
                             maxWidth: '85%',
-                            background: isMine ? 'rgba(140, 12, 16, 0.18)' : 'rgba(255,255,255,0.03)',
-                            border: isMine ? '1px solid rgba(140, 12, 16, 0.3)' : '1px solid var(--border-light)',
+                            background: isWhisper 
+                              ? 'rgba(0, 229, 255, 0.07)'
+                              : isMine 
+                                ? 'rgba(140, 12, 16, 0.18)' 
+                                : 'rgba(255,255,255,0.03)',
+                            border: isWhisper
+                              ? '1px dashed var(--accent-cyan)'
+                              : isMine 
+                                ? '1px solid rgba(140, 12, 16, 0.3)' 
+                                : '1px solid var(--border-light)',
                             borderRadius: '8px',
                             padding: '0.5rem 0.75rem',
                             display: 'flex',
-                            flexDirection: 'column'
+                            flexDirection: 'column',
+                            boxShadow: isWhisper ? '0 0 10px rgba(0, 229, 255, 0.05)' : 'none'
                           }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '0.15rem' }}>
-                            <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--text-gold)' }}>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: isWhisper ? 'var(--accent-cyan)' : 'var(--text-gold)', display: 'flex', alignItems: 'center', gap: '0.2rem', flexWrap: 'wrap' }}>
                               {msg.sender_username}
+                              {isWhisper && (
+                                <span style={{ fontStyle: 'italic', fontWeight: 'normal', color: 'var(--text-muted)' }}>
+                                  cochichou para {msg.recipient_username || 'Você'} 🤫
+                                </span>
+                              )}
                             </span>
                             <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
                               {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -753,8 +839,39 @@ export default function FloatingCampaignDrawer({
 
                           {isRoll ? (
                             renderRollDetails(msg.roll_details)
+                          ) : msg.content.includes('[Roll20]') ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                                {msg.content.replace(/\[Mesa de Combate no Roll20\].*/g, '').trim()}
+                              </span>
+                              <a
+                                href={character?.session?.roll20_url || '#'}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn-occult"
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  fontSize: '0.75rem',
+                                  background: 'linear-gradient(135deg, var(--accent-cyan) 0%, #008b8b 100%)',
+                                  color: '#000',
+                                  fontWeight: 'bold',
+                                  textAlign: 'center',
+                                  textDecoration: 'none',
+                                  borderRadius: '4px',
+                                  boxShadow: '0 0 12px rgba(0, 229, 255, 0.25)',
+                                  justifyContent: 'center',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  fontFamily: 'var(--font-gothic)',
+                                  letterSpacing: '0.05em'
+                                }}
+                              >
+                                ⚔️ ACESSAR MESA ROLL20 ⚔️
+                              </a>
+                            </div>
                           ) : (
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                            <span style={{ fontSize: '0.8rem', color: isWhisper ? 'var(--accent-cyan)' : 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
                               {msg.content}
                             </span>
                           )}
@@ -777,32 +894,78 @@ export default function FloatingCampaignDrawer({
                       borderTop: '1px solid var(--border-light)',
                       background: 'rgba(0,0,0,0.3)',
                       display: 'flex',
+                      flexDirection: 'column',
                       gap: '0.5rem'
                     }}
                   >
-                    <input
-                      type="text"
-                      className="chat-input-field"
-                      placeholder="Falar na sessão..."
-                      value={chatInput}
-                      onChange={e => setChatInput(e.target.value)}
-                      style={{
-                        flex: 1,
-                        background: 'rgba(0,0,0,0.4)',
-                        border: '1px solid var(--border-light)',
-                        borderRadius: '4px',
-                        padding: '0.5rem',
-                        fontSize: '0.8rem',
-                        color: '#fff'
-                      }}
-                    />
-                    <button
-                      type="submit"
-                      className="btn-occult"
-                      style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', minWidth: '70px', justifyContent: 'center' }}
-                    >
-                      Enviar
-                    </button>
+                    {character.id === -999 && (
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.1rem' }}>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--accent-cyan)', fontWeight: 'bold' }}>🤫 Cochichar com:</span>
+                        <select
+                          value={whisperRecipientId || ''}
+                          onChange={(e) => setWhisperRecipientId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                          style={{
+                            background: 'rgba(0,0,0,0.6)',
+                            border: whisperRecipientId ? '1px solid var(--accent-cyan)' : '1px solid var(--border-light)',
+                            borderRadius: '4px',
+                            color: whisperRecipientId ? 'var(--accent-cyan)' : '#fff',
+                            fontSize: '0.7rem',
+                            padding: '0.2rem 0.4rem',
+                            cursor: 'pointer',
+                            outline: 'none'
+                          }}
+                        >
+                          <option value="">📢 Todos na Mesa (Público)</option>
+                          {participants.map((p: any) => (
+                            <option key={p.owner_id} value={p.owner_id}>
+                              👤 {p.name} ({p.owner_username})
+                            </option>
+                          ))}
+                        </select>
+                        {whisperRecipientId && (
+                          <button
+                            type="button"
+                            onClick={() => setWhisperRecipientId(null)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-crimson)',
+                              fontSize: '0.65rem',
+                              cursor: 'pointer',
+                              padding: 0
+                            }}
+                          >
+                            Limpar
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                      <input
+                        type="text"
+                        className="chat-input-field"
+                        placeholder={whisperRecipientId ? "Cochichar em segredo..." : "Falar na sessão..."}
+                        value={chatInput}
+                        onChange={e => setChatInput(e.target.value)}
+                        style={{
+                          flex: 1,
+                          background: 'rgba(0,0,0,0.4)',
+                          border: whisperRecipientId ? '1px solid var(--accent-cyan)' : '1px solid var(--border-light)',
+                          borderRadius: '4px',
+                          padding: '0.5rem',
+                          fontSize: '0.8rem',
+                          color: '#fff'
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        className="btn-occult"
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', minWidth: '70px', justifyContent: 'center' }}
+                      >
+                        Enviar
+                      </button>
+                    </div>
                   </form>
                 </div>
               )}
