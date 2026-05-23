@@ -175,17 +175,207 @@ export default function NpcsEvidenceCampaigns({
     };
   }, [activeSession]);
 
+  const parseAndExecuteChatRollCommand = async (text: string): Promise<{ handled: boolean; error?: string }> => {
+    const parts = text.trim().split(/\s+/);
+    const command = parts[0].toLowerCase();
+    
+    if (!['/roll', '/r', '/rolar', '/dado'].includes(command)) {
+      return { handled: false };
+    }
+
+    if (!activeSession) {
+      return { handled: true, error: 'Selecione uma campanha ativa antes de realizar rolagens por chat.' };
+    }
+
+    const queryStr = parts.slice(1).join(' ').trim();
+    if (!queryStr) {
+      return { handled: true, error: 'Digite a expressão de dados, atributo ou perícia. Ex: /r 3d6+4 ou /r força' };
+    }
+
+    // 1. Check if the query is a direct dice expression (e.g. "3d6+4", "d100", "d20", "1d100")
+    const isDiceExpression = /^\d*d\d+([+-]\d+)?$/i.test(queryStr);
+
+    let resultExpression = '';
+    let resultTotal = 0;
+    let resultRolls: number[] = [];
+    let resultBonusPenaltyRolls: number[] = [];
+    let isCriticalSuccess = false;
+    let isCriticalFail = false;
+    let characterName = 'Investigador';
+    let contentText = '';
+
+    // Load active character
+    let character = null;
+    if (characterId) {
+      try {
+        const charRes = await fetch(`/api/characters/${characterId}`);
+        if (charRes.ok) {
+          character = await charRes.json();
+          characterName = character.name;
+        }
+      } catch (err) {
+        console.warn(err);
+      }
+    }
+
+    if (isDiceExpression) {
+      const expr = queryStr.toLowerCase();
+      const match = expr.match(/^(\d*)d(\d+)([+-]\d+)?$/);
+      if (!match) return { handled: true, error: 'Expressão de dados inválida' };
+
+      const count = parseInt(match[1] || '1', 10);
+      const sides = parseInt(match[2], 10);
+      const modifier = parseInt(match[3] || '0', 10);
+
+      const rolls = Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1);
+      const total = rolls.reduce((a, b) => a + b, 0) + modifier;
+
+      resultExpression = `${count}d${sides}${modifier !== 0 ? (modifier > 0 ? '+' : '') + modifier : ''}`;
+      resultTotal = total;
+      resultRolls = rolls;
+      isCriticalSuccess = sides === 100 && total === 1;
+      isCriticalFail = sides === 100 && (total === 100 || total >= 96);
+      contentText = `${characterName} rolou ${resultExpression}: ${resultTotal}`;
+    } else if (character) {
+      // 2. Check if the query is an attribute or skill of the active character
+      const normQuery = queryStr.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+      const attributesMap: { [key: string]: { name: string; key: string } } = {
+        'forca': { name: 'FOR (Força)', key: 'str' },
+        'for': { name: 'FOR (Força)', key: 'str' },
+        'destreza': { name: 'DES (Destreza)', key: 'dex' },
+        'des': { name: 'DES (Destreza)', key: 'dex' },
+        'dex': { name: 'DES (Destreza)', key: 'dex' },
+        'inteligencia': { name: 'INT (Inteligência)', key: 'int_val' },
+        'int': { name: 'INT (Inteligência)', key: 'int_val' },
+        'constituicao': { name: 'CON (Constituição)', key: 'con' },
+        'con': { name: 'CON (Constituição)', key: 'con' },
+        'aparencia': { name: 'APA (Aparência)', key: 'app' },
+        'apa': { name: 'APA (Aparência)', key: 'app' },
+        'app': { name: 'APA (Aparência)', key: 'app' },
+        'poder': { name: 'POD (Poder)', key: 'pow' },
+        'pod': { name: 'POD (Poder)', key: 'pow' },
+        'pow': { name: 'POD (Poder)', key: 'pow' },
+        'tamanho': { name: 'TAM (Tamanho)', key: 'siz' },
+        'tam': { name: 'TAM (Tamanho)', key: 'siz' },
+        'siz': { name: 'TAM (Tamanho)', key: 'siz' },
+        'educacao': { name: 'EDU (Educação)', key: 'edu' },
+        'edu': { name: 'EDU (Educação)', key: 'edu' },
+        'sorte': { name: 'SOR (Sorte)', key: 'luck' },
+        'sor': { name: 'SOR (Sorte)', key: 'luck' },
+        'luck': { name: 'SOR (Sorte)', key: 'luck' },
+      };
+
+      let targetValue = 0;
+      let targetName = '';
+
+      if (attributesMap[normQuery]) {
+        const attr = attributesMap[normQuery];
+        targetValue = character[attr.key] || 50;
+        targetName = attr.name;
+      } else {
+        const matchedSkill = (character.skills || []).find((s: any) => {
+          const normSkillName = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          return normSkillName.includes(normQuery);
+        });
+
+        if (matchedSkill) {
+          targetValue = (matchedSkill.base_value || 0) + (matchedSkill.occ_points || 0) + (matchedSkill.int_points || 0) + (matchedSkill.game_points || 0);
+          targetName = matchedSkill.name;
+        }
+      }
+
+      if (targetValue > 0) {
+        const tens = Math.floor(Math.random() * 10) * 10;
+        const units = Math.floor(Math.random() * 10);
+        let baseRoll = tens + units;
+        if (baseRoll === 0) baseRoll = 100;
+
+        resultExpression = '1d100';
+        resultTotal = baseRoll;
+        resultRolls = [baseRoll];
+        isCriticalSuccess = baseRoll === 1;
+        isCriticalFail = baseRoll === 100 || (targetValue < 50 && baseRoll >= 96);
+        
+        let level = '';
+        if (baseRoll === 1) level = 'CRÍTICO! ⛧';
+        else if (isCriticalFail) level = 'DESASTRE! 💀';
+        else if (baseRoll <= Math.floor(targetValue / 5)) level = 'Extremo (1/5)';
+        else if (baseRoll <= Math.floor(targetValue / 2)) level = 'Bom (1/2)';
+        else if (baseRoll <= targetValue) level = 'Normal';
+        else level = 'Fracasso';
+
+        contentText = `${characterName} rolou ${targetName} (${targetValue}): resultado ${baseRoll} (${level})`;
+      } else {
+        return { handled: true, error: `Atributo ou Perícia "${queryStr}" não encontrado no seu investigador.` };
+      }
+    } else {
+      return { handled: true, error: 'Selecione um investigador primeiro ou digite uma rolagem numérica direta (Ex: /r 3d6+4).' };
+    }
+
+    try {
+      await fetch(`/api/sessions/${activeSession.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: contentText,
+          message_type: 'roll',
+          roll_details: {
+            expression: resultExpression,
+            total: resultTotal,
+            rolls: resultRolls,
+            bonusPenaltyRolls: resultBonusPenaltyRolls,
+            isCriticalSuccess,
+            isCriticalFail,
+            characterName
+          }
+        })
+      });
+
+      // Save to local dice history silently
+      fetch('/api/dice/roll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          characterId: character.id,
+          expression: resultExpression,
+          result: resultTotal,
+          details: `Chat roll de ${queryStr}: ${contentText}`
+        })
+      }).catch(err => console.warn(err));
+
+      return { handled: true };
+    } catch (err) {
+      console.error(err);
+      return { handled: true, error: 'Falha ao transmitir rolagem' };
+    }
+  };
+
   // Send Chat Message
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatInput.trim() || !activeSession) return;
+    const input = chatInput.trim();
+    if (!input || !activeSession) return;
+
+    // Check if it's a dice roll command starting with /
+    if (input.startsWith('/')) {
+      const rollRes = await parseAndExecuteChatRollCommand(input);
+      if (rollRes.handled) {
+        if (rollRes.error) {
+          alert(rollRes.error);
+        } else {
+          setChatInput('');
+        }
+        return;
+      }
+    }
 
     try {
       const res = await fetch(`/api/sessions/${activeSession.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: chatInput.trim(),
+          content: input,
           message_type: 'chat'
         })
       });

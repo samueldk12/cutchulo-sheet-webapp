@@ -187,14 +187,98 @@ export default function GmPanel() {
     }
   };
 
+  const parseAndExecuteGmRollCommand = async (text: string): Promise<{ handled: boolean; error?: string }> => {
+    const parts = text.trim().split(/\s+/);
+    const command = parts[0].toLowerCase();
+    
+    if (!['/roll', '/r', '/rolar', '/dado'].includes(command)) {
+      return { handled: false };
+    }
+
+    const queryStr = parts.slice(1).join(' ').trim();
+    if (!queryStr) {
+      return { handled: true, error: 'Digite a expressão de dados. Ex: /r 3d6+4 ou /r 1d100' };
+    }
+
+    const isDiceExpression = /^\d*d\d+([+-]\d+)?$/i.test(queryStr);
+    if (!isDiceExpression) {
+      return { handled: true, error: 'Como Mestre, você deve especificar uma expressão de dados numérica. Ex: /r 3d6+4 ou /r 1d100' };
+    }
+
+    const expr = queryStr.toLowerCase();
+    const match = expr.match(/^(\d*)d(\d+)([+-]\d+)?$/);
+    if (!match) return { handled: true, error: 'Expressão de dados inválida' };
+
+    const count = parseInt(match[1] || '1', 10);
+    const sides = parseInt(match[2], 10);
+    const modifier = parseInt(match[3] || '0', 10);
+
+    const rolls = Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1);
+    const total = rolls.reduce((a, b) => a + b, 0) + modifier;
+
+    const resultExpression = `${count}d${sides}${modifier !== 0 ? (modifier > 0 ? '+' : '') + modifier : ''}`;
+    const resultTotal = total;
+    const resultRolls = rolls;
+    const isCriticalSuccess = sides === 100 && total === 1;
+    const isCriticalFail = sides === 100 && (total === 100 || total >= 96);
+    const characterName = 'Mestre (GM)';
+    const contentText = `${characterName} rolou ${resultExpression}: ${resultTotal}`;
+
+    try {
+      await fetch(`/api/sessions/${selectedSessionId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: contentText,
+          message_type: 'roll',
+          roll_details: {
+            expression: resultExpression,
+            total: resultTotal,
+            rolls: resultRolls,
+            bonusPenaltyRolls: [],
+            isCriticalSuccess,
+            isCriticalFail,
+            characterName
+          }
+        })
+      });
+
+      // Post GM roll directly to campaign log as well
+      await fetch(`/api/sessions/${selectedSessionId}/log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: `[Mestre Rolou ${resultExpression}] Resultado: ${resultTotal} | [${resultRolls.join(', ')}]` }),
+      });
+
+      return { handled: true };
+    } catch (err) {
+      console.error(err);
+      return { handled: true, error: 'Falha ao transmitir rolagem do mestre' };
+    }
+  };
+
   // Send Live Chat Message / Whisper
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatInput.trim() || !selectedSessionId) return;
+    const input = chatInput.trim();
+    if (!input || !selectedSessionId) return;
+
+    // Check if it's a dice roll command starting with /
+    if (input.startsWith('/')) {
+      const rollRes = await parseAndExecuteGmRollCommand(input);
+      if (rollRes.handled) {
+        if (rollRes.error) {
+          alert(rollRes.error);
+        } else {
+          setChatInput('');
+        }
+        return;
+      }
+    }
 
     const isWhisper = whisperTarget !== 'all';
     const payload = {
-      content: chatInput.trim(),
+      content: input,
       message_type: isWhisper ? 'whisper' : 'chat',
       recipient_id: isWhisper ? parseInt(whisperTarget, 10) : null
     };
