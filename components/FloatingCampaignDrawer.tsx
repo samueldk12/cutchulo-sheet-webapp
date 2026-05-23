@@ -56,7 +56,7 @@ export default function FloatingCampaignDrawer({
 
   // Load Spells
   const loadSpells = async () => {
-    if (!character?.id) return;
+    if (!character?.id || character.id === -999) return;
     try {
       const res = await fetch(`/api/spells?character_id=${character.id}`);
       if (res.ok) {
@@ -69,7 +69,7 @@ export default function FloatingCampaignDrawer({
   };
 
   useEffect(() => {
-    if (character?.id) {
+    if (character?.id && character.id !== -999) {
       loadSpells();
     }
   }, [character?.id]);
@@ -177,7 +177,12 @@ export default function FloatingCampaignDrawer({
 
     const queryStr = parts.slice(1).join(' ').trim();
     if (!queryStr) {
-      return { handled: true, error: 'Digite a expressão de dados, atributo ou perícia. Ex: /r 3d6+4 ou /r força' };
+      return { 
+        handled: true, 
+        error: character?.id === -999 
+          ? 'Digite a expressão de dados. Ex: /r 3d6+4 ou /r d100' 
+          : 'Digite a expressão de dados, atributo ou perícia. Ex: /r 3d6+4 ou /r força' 
+      };
     }
 
     // 1. Check if the query is a direct dice expression (e.g. "3d6+4", "d100", "d20", "1d100")
@@ -210,9 +215,15 @@ export default function FloatingCampaignDrawer({
       isCriticalSuccess = sides === 100 && total === 1;
       isCriticalFail = sides === 100 && (total === 100 || total >= 96);
       contentText = `${characterName} rolou ${resultExpression}: ${resultTotal}`;
-    } else {
-      // 2. Check if the query is an attribute or skill of the active character
-      const normQuery = queryStr.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      } else {
+        if (character?.id === -999) {
+          return { 
+            handled: true, 
+            error: 'Como Mestre (GM), você deve especificar uma expressão numérica de dados (ex: /r 1d100 ou /r 3d6+4) ou utilizar o atalho nos cards dos investigadores.' 
+          };
+        }
+        // 2. Check if the query is an attribute or skill of the active character
+        const normQuery = queryStr.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
       const attributesMap: { [key: string]: { name: string; key: string } } = {
         'forca': { name: 'FOR (Força)', key: 'str' },
@@ -669,28 +680,28 @@ export default function FloatingCampaignDrawer({
             }}>
               {[
                 { label: '💬 Chat da Sessão', key: 'chat' },
-                { label: '🔮 Grimório (Magias)', key: 'spells' },
+                character?.id !== -999 && { label: '🔮 Grimório (Magias)', key: 'spells' },
                 { label: '📚 Biblioteca', key: 'library' },
-              ].map(t => (
+              ].filter(Boolean).map(t => (
                 <button
-                  key={t.key}
-                  onClick={() => setActiveTab(t.key as any)}
+                  key={(t as any).key}
+                  onClick={() => setActiveTab((t as any).key as any)}
                   style={{
                     flex: 1,
                     padding: '0.9rem',
-                    background: activeTab === t.key ? 'rgba(140,12,16,0.1)' : 'transparent',
+                    background: activeTab === (t as any).key ? 'rgba(140,12,16,0.1)' : 'transparent',
                     border: 'none',
-                    borderBottom: activeTab === t.key ? '2px solid var(--primary-crimson)' : '2px solid transparent',
-                    color: activeTab === t.key ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    borderBottom: activeTab === (t as any).key ? '2px solid var(--primary-crimson)' : '2px solid transparent',
+                    color: activeTab === (t as any).key ? 'var(--text-primary)' : 'var(--text-secondary)',
                     fontSize: '0.8rem',
-                    fontWeight: activeTab === t.key ? 'bold' : 'normal',
+                    fontWeight: activeTab === (t as any).key ? 'bold' : 'normal',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em'
                   }}
                 >
-                  {t.label}
+                  {(t as any).label}
                 </button>
               ))}
             </div>

@@ -7,6 +7,7 @@ import InvestigatorSkills from '../../components/InvestigatorSkills';
 import InvestigatorCombat from '../../components/InvestigatorCombat';
 import InvestigatorBackstory from '../../components/InvestigatorBackstory';
 import DiceRollerModal from '../../components/DiceRollerModal';
+import FloatingCampaignDrawer from '../../components/FloatingCampaignDrawer';
 import Link from 'next/link';
 
 export default function GmPanel() {
@@ -23,6 +24,12 @@ export default function GmPanel() {
   const [newLogContent, setNewLogContent] = useState('');
   const [loadingDetails, setLoadingDetails] = useState(false);
 
+  // Spawner and Tracker state
+  const [newNpcName, setNewNpcName] = useState('');
+  const [sortByDex, setSortByDex] = useState(true);
+  const [activeTurnCharId, setActiveTurnCharId] = useState<number | null>(null);
+  const [notesText, setNotesText] = useState('');
+
   // Edit Modal State
   const [editingChar, setEditingChar] = useState<any | null>(null);
   const [gmActiveTab, setGmActiveTab] = useState<string>('general');
@@ -36,14 +43,22 @@ export default function GmPanel() {
 
   // Terminal Auto Scroll
   const logTerminalRef = useRef<HTMLDivElement>(null);
-
-  // Live Chat Room State
-  const [chatMessages, setChatMessages] = useState<any[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [whisperTarget, setWhisperTarget] = useState<string>('all');
   const [roll20Input, setRoll20Input] = useState('');
 
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  // Load GM notepad notes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cutchulo_gm_notes');
+      if (saved) setNotesText(saved);
+    }
+  }, []);
+
+  const handleNotesChange = (text: string) => {
+    setNotesText(text);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cutchulo_gm_notes', text);
+    }
+  };
 
   // Load list of sessions
   const loadSessions = async () => {
@@ -119,48 +134,12 @@ export default function GmPanel() {
     }
   }, [sessionDetails?.logs]);
 
-  // Synchronize Roll20 URL state with incoming campaign updates
+  // Synchronize Roll20 URL state
   useEffect(() => {
     if (sessionDetails) {
       setRoll20Input(prev => prev || sessionDetails.roll20_url || '');
     }
   }, [sessionDetails]);
-
-  // Load chat messages
-  const loadChatMessages = async (sessId: number) => {
-    try {
-      const res = await fetch(`/api/sessions/${sessId}/messages`);
-      if (res.ok) {
-        const data = await res.json();
-        setChatMessages(data);
-      }
-    } catch (err) {
-      console.error('Error loading chat messages:', err);
-    }
-  };
-
-  // Poll Chat Messages every 3 seconds
-  useEffect(() => {
-    if (!selectedSessionId) {
-      setChatMessages([]);
-      return;
-    }
-
-    loadChatMessages(selectedSessionId);
-
-    const chatInterval = setInterval(() => {
-      loadChatMessages(selectedSessionId);
-    }, 3000);
-
-    return () => clearInterval(chatInterval);
-  }, [selectedSessionId]);
-
-  // Auto-scroll the live campaign chat
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [chatMessages]);
 
   // Update Roll20 URL
   const handleUpdateRoll20Url = async () => {
@@ -185,145 +164,6 @@ export default function GmPanel() {
     } catch (err) {
       console.error(err);
     }
-  };
-
-  const parseAndExecuteGmRollCommand = async (text: string): Promise<{ handled: boolean; error?: string }> => {
-    const parts = text.trim().split(/\s+/);
-    const command = parts[0].toLowerCase();
-    
-    if (!['/roll', '/r', '/rolar', '/dado'].includes(command)) {
-      return { handled: false };
-    }
-
-    const queryStr = parts.slice(1).join(' ').trim();
-    if (!queryStr) {
-      return { handled: true, error: 'Digite a expressão de dados. Ex: /r 3d6+4 ou /r 1d100' };
-    }
-
-    const isDiceExpression = /^\d*d\d+([+-]\d+)?$/i.test(queryStr);
-    if (!isDiceExpression) {
-      return { handled: true, error: 'Como Mestre, você deve especificar uma expressão de dados numérica. Ex: /r 3d6+4 ou /r 1d100' };
-    }
-
-    const expr = queryStr.toLowerCase();
-    const match = expr.match(/^(\d*)d(\d+)([+-]\d+)?$/);
-    if (!match) return { handled: true, error: 'Expressão de dados inválida' };
-
-    const count = parseInt(match[1] || '1', 10);
-    const sides = parseInt(match[2], 10);
-    const modifier = parseInt(match[3] || '0', 10);
-
-    const rolls = Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1);
-    const total = rolls.reduce((a, b) => a + b, 0) + modifier;
-
-    const resultExpression = `${count}d${sides}${modifier !== 0 ? (modifier > 0 ? '+' : '') + modifier : ''}`;
-    const resultTotal = total;
-    const resultRolls = rolls;
-    const isCriticalSuccess = sides === 100 && total === 1;
-    const isCriticalFail = sides === 100 && (total === 100 || total >= 96);
-    const characterName = 'Mestre (GM)';
-    const contentText = `${characterName} rolou ${resultExpression}: ${resultTotal}`;
-
-    try {
-      await fetch(`/api/sessions/${selectedSessionId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: contentText,
-          message_type: 'roll',
-          roll_details: {
-            expression: resultExpression,
-            total: resultTotal,
-            rolls: resultRolls,
-            bonusPenaltyRolls: [],
-            isCriticalSuccess,
-            isCriticalFail,
-            characterName
-          }
-        })
-      });
-
-      // Post GM roll directly to campaign log as well
-      await fetch(`/api/sessions/${selectedSessionId}/log`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: `[Mestre Rolou ${resultExpression}] Resultado: ${resultTotal} | [${resultRolls.join(', ')}]` }),
-      });
-
-      return { handled: true };
-    } catch (err) {
-      console.error(err);
-      return { handled: true, error: 'Falha ao transmitir rolagem do mestre' };
-    }
-  };
-
-  // Send Live Chat Message / Whisper
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const input = chatInput.trim();
-    if (!input || !selectedSessionId) return;
-
-    // Check if it's a dice roll command starting with /
-    if (input.startsWith('/')) {
-      const rollRes = await parseAndExecuteGmRollCommand(input);
-      if (rollRes.handled) {
-        if (rollRes.error) {
-          alert(rollRes.error);
-        } else {
-          setChatInput('');
-        }
-        return;
-      }
-    }
-
-    const isWhisper = whisperTarget !== 'all';
-    const payload = {
-      content: input,
-      message_type: isWhisper ? 'whisper' : 'chat',
-      recipient_id: isWhisper ? parseInt(whisperTarget, 10) : null
-    };
-
-    try {
-      const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        const newMsg = await res.json();
-        setChatMessages(prev => [...prev, newMsg]);
-        setChatInput('');
-      }
-    } catch (err) {
-      console.error('Error sending GM chat message:', err);
-    }
-  };
-
-  const renderRollDetails = (rollDetails: any) => {
-    if (!rollDetails) return null;
-    const { expression, total, rolls, characterName, isCriticalSuccess, isCriticalFail } = rollDetails;
-    
-    let outcome = '';
-    let outcomeClass = 'success-regular';
-    if (isCriticalSuccess) {
-      outcome = 'CRÍTICO! ⛧';
-      outcomeClass = 'success-extreme';
-    } else if (isCriticalFail) {
-      outcome = 'DESASTRE! 💀';
-      outcomeClass = 'success-fumble';
-    }
-
-    return (
-      <div className="chat-roll-card">
-        <span className="chat-roll-char-name">{characterName}</span>
-        <span className="chat-roll-expr">Rolou {expression}</span>
-        <div className="chat-roll-total-box">
-          <span className="chat-roll-total-value">{total}</span>
-          {outcome && <span className={`dice-success-badge ${outcomeClass}`} style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', border: 'none' }}>{outcome}</span>}
-        </div>
-        <span className="chat-roll-details">Resultados: [{rolls?.join(', ')}]</span>
-      </div>
-    );
   };
 
   if (authLoading) {
@@ -393,7 +233,33 @@ export default function GmPanel() {
     }
   };
 
-  // Vitals direct adjustments by GM
+  // Vital direct edits via input change (auto save)
+  const handleVitalInputChange = async (charId: number, field: string, valStr: string, maxField: string) => {
+    const char = sessionDetails?.characters?.find((x: any) => x.id === charId);
+    if (!char) return;
+    let val = parseInt(valStr, 10);
+    if (isNaN(val)) return;
+    const max = char[maxField] || 99;
+    val = Math.max(0, Math.min(max, val));
+
+    // Optimistic local UI state update
+    const updatedCharacters = sessionDetails.characters.map((c: any) =>
+      c.id === charId ? { ...c, [field]: val } : c
+    );
+    setSessionDetails({ ...sessionDetails, characters: updatedCharacters });
+
+    try {
+      await fetch(`/api/characters/${charId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: val }),
+      });
+    } catch (err) {
+      console.error('GM vital input change error:', err);
+    }
+  };
+
+  // Vital adjustments via simple increment/decrement buttons
   const handleAdjustVitalDirect = async (charId: number, field: string, delta: number, maxField: string) => {
     const char = sessionDetails?.characters?.find((c: any) => c.id === charId);
     if (!char) return;
@@ -416,6 +282,64 @@ export default function GmPanel() {
       });
     } catch (err) {
       console.error('GM direct vital adjustment error:', err);
+    }
+  };
+
+  // Toggle insanity statuses on/off
+  const handleToggleInsanity = async (charId: number, field: string) => {
+    const char = sessionDetails?.characters?.find((x: any) => x.id === charId);
+    if (!char) return;
+    const nextVal = char[field] === 1 ? 0 : 1;
+
+    // Optimistic local update
+    const updatedCharacters = sessionDetails.characters.map((c: any) =>
+      c.id === charId ? { ...c, [field]: nextVal } : c
+    );
+    setSessionDetails({ ...sessionDetails, characters: updatedCharacters });
+
+    try {
+      await fetch(`/api/characters/${charId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: nextVal }),
+      });
+    } catch (err) {
+      console.error('GM toggle insanity error:', err);
+    }
+  };
+
+  // Fast spawn NPCs/Monsters directly in the active campaign session
+  const handleSpawnNpcDirect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newNpcName.trim() || !selectedSessionId) return;
+
+    try {
+      const res = await fetch(`/api/sessions/${selectedSessionId}/npc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newNpcName }),
+      });
+      if (res.ok) {
+        setNewNpcName('');
+        fetchSessionDetails(selectedSessionId, true);
+      } else {
+        alert('Falha ao evocar NPC.');
+      }
+    } catch (err) {
+      console.error('Error spawning NPC:', err);
+    }
+  };
+
+  // Sacrificar NPC (delete)
+  const handleSacrificeNpc = async (charId: number) => {
+    if (!confirm('Deseja mesmo sacrificar esta criatura/NPC? A ficha será apagada para sempre.')) return;
+    try {
+      const res = await fetch(`/api/characters/${charId}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchSessionDetails(selectedSessionId!, true);
+      }
+    } catch (err) {
+      console.error('Error sacrificing NPC:', err);
     }
   };
 
@@ -602,20 +526,78 @@ export default function GmPanel() {
     setIsDiceOpen(true);
   };
 
-  // Callback to append GM rolls directly to campaign log
+  // Callback to append GM rolls directly to campaign log AND session live chat
   const handleRollComplete = async (roll: any) => {
     if (!selectedSessionId) return;
+
+    const isCriticalSuccess = roll.expression === '1d100' && roll.result === 1;
+    const isCriticalFail = roll.expression === '1d100' && (roll.result === 100 || roll.result >= 96);
+    const characterName = 'Mestre (GM)';
+    const contentText = `${characterName} rolou ${roll.expression}: ${roll.result} (${roll.details})`;
+
     try {
+      // 1. Post to live chat messages
+      await fetch(`/api/sessions/${selectedSessionId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: contentText,
+          message_type: 'roll',
+          roll_details: {
+            expression: roll.expression,
+            total: roll.result,
+            rolls: roll.rolls || [roll.result],
+            bonusPenaltyRolls: [],
+            isCriticalSuccess,
+            isCriticalFail,
+            characterName
+          }
+        })
+      });
+
+      // 2. Post to campaign log terminal
       await fetch(`/api/sessions/${selectedSessionId}/log`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: `[Mestre Rolou ${roll.expression}] Resultado: ${roll.result} | ${roll.details}` }),
       });
+
       fetchSessionDetails(selectedSessionId, true);
     } catch (err) {
       console.warn('GM log roll error:', err);
     }
   };
+
+  // Handle clicking on the access code to instantly copy it
+  const handleCopyAccessCode = () => {
+    if (sessionDetails?.code) {
+      navigator.clipboard.writeText(sessionDetails.code);
+      alert(`Código de Entrada "${sessionDetails.code}" copiado!`);
+    }
+  };
+
+  // Mock character for GM Floating Campaign Drawer
+  const gmCharacterMock = sessionDetails ? {
+    id: -999,
+    name: 'Mestre (GM)',
+    session: {
+      id: sessionDetails.id
+    }
+  } : null;
+
+  // Process characters list (PCs + NPCs) with custom order (DEX or name)
+  const processCharacters = () => {
+    if (!sessionDetails?.characters) return [];
+    
+    const list = [...sessionDetails.characters];
+    if (sortByDex) {
+      return list.sort((a, b) => (b.dex || 0) - (a.dex || 0));
+    } else {
+      return list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+  };
+
+  const processedCharacters = processCharacters();
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg-deep)' }}>
@@ -650,20 +632,25 @@ export default function GmPanel() {
               </button>
 
               {/* Glowing Join Code Box */}
-              <div style={{
-                background: 'rgba(0, 243, 255, 0.05)',
-                border: '2px dashed var(--accent-cyan)',
-                borderRadius: '8px',
-                padding: '0.8rem',
-                textAlign: 'center',
-                boxShadow: 'inset 0 0 10px rgba(0, 243, 255, 0.1)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '0.2rem',
-                marginTop: '0.5rem'
-              }}>
-                <span className="gothic-label" style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>CÓDIGO DE ENTRADA</span>
+              <div 
+                style={{
+                  background: 'rgba(0, 243, 255, 0.05)',
+                  border: '2px dashed var(--accent-cyan)',
+                  borderRadius: '8px',
+                  padding: '0.8rem',
+                  textAlign: 'center',
+                  boxShadow: 'inset 0 0 10px rgba(0, 243, 255, 0.1)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '0.2rem',
+                  marginTop: '0.5rem',
+                  cursor: 'pointer'
+                }}
+                onClick={handleCopyAccessCode}
+                title="Clique para copiar o código"
+              >
+                <span className="gothic-label" style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>CÓDIGO DE ENTRADA 📋</span>
                 <span style={{
                   fontSize: '1.8rem',
                   fontWeight: 'bold',
@@ -674,7 +661,7 @@ export default function GmPanel() {
                 }}>
                   {sessionDetails.code}
                 </span>
-                <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>Código para jogadores entrarem</span>
+                <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>Clique para copiar</span>
               </div>
 
               {/* Roll20 Setup Portal */}
@@ -780,14 +767,14 @@ export default function GmPanel() {
           </div>
         ) : sessionDetails ? (
           <>
-            {/* Header section with session name, description, and dynamic Roll20 launcher */}
-            <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.5rem', gap: '1.5rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
-                <h1 style={{ fontFamily: 'var(--font-gothic)', color: 'var(--text-gold)', fontSize: '1.8rem', margin: 0 }}>
+            {/* Header section */}
+            <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', gap: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', flex: 1 }}>
+                <h1 style={{ fontFamily: 'var(--font-gothic)', color: 'var(--text-gold)', fontSize: '1.6rem', margin: 0 }}>
                   {sessionDetails.name}
                 </h1>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-                  {sessionDetails.notes || 'Nenhuma descrição adicionada.'}
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>
+                  {sessionDetails.notes || 'Nenhuma descrição.'}
                 </p>
               </div>
 
@@ -798,8 +785,8 @@ export default function GmPanel() {
                   rel="noopener noreferrer"
                   className="btn-occult"
                   style={{
-                    padding: '0.6rem 1.2rem',
-                    fontSize: '0.85rem',
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.8rem',
                     textDecoration: 'none',
                     background: 'linear-gradient(135deg, var(--accent-gold) 0%, #b8860b 100%)',
                     color: '#000',
@@ -817,272 +804,437 @@ export default function GmPanel() {
               )}
             </div>
 
-            {/* Live Campaign Grid (3 Columns: Players List, Live Room Chat & Mono Terminal Log) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.8fr', gap: '1.5rem', alignItems: 'start' }} className="gm-campaign-grid-three-col">
+            {/* High-Usability Grid (2 Columns: Initiatives/Combat & Notes/Tools) */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '1.5rem', alignItems: 'start' }} className="gm-campaign-grid-two-col">
               
-              {/* Left: joined player investigator cards */}
+              {/* Left Column: Combat Initiative Tracker & PC/NPC Cards */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h2 style={{ fontFamily: 'var(--font-gothic)', color: 'var(--text-crimson)', fontSize: '1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  Investigadores
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>
-                    Qtd: {sessionDetails.characters?.length || 0}
-                  </span>
-                </h2>
-
-                <div className="gm-player-grid" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {sessionDetails.characters?.map((c: any) => (
-                    <div key={c.id} className="gm-player-card" style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      
-                      {/* Investigator Info & Header */}
-                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                        <span style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '4px',
-                          border: '1px solid var(--border-gold)',
-                          background: c.image ? `url(${c.image}) center/cover no-repeat` : 'rgba(0,0,0,0.5)',
-                          display: 'block'
-                        }} />
-                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                          <span style={{ fontWeight: 'bold', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-gold)' }}>
-                            {c.name}
-                          </span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                            Jogador: <strong style={{ color: '#fff' }}>{c.owner_username}</strong>
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Vitals adjusting console */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px' }}>
-                        
-                        {/* HP */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>PV: <strong>{c.hp_current}/{c.hp_max}</strong></span>
-                          <div style={{ display: 'flex', gap: '0.2rem' }}>
-                            <button type="button" className="vital-btn" style={{ padding: '0.1rem 0.3rem', fontSize: '0.65rem' }} onClick={() => handleAdjustVitalDirect(c.id, 'hp_current', -1, 'hp_max')}>-1</button>
-                            <button type="button" className="vital-btn" style={{ padding: '0.1rem 0.3rem', fontSize: '0.65rem' }} onClick={() => handleAdjustVitalDirect(c.id, 'hp_current', 1, 'hp_max')}>+1</button>
-                          </div>
-                        </div>
-
-                        {/* MP */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>PM: <strong>{c.mp_current}/{c.mp_max}</strong></span>
-                          <div style={{ display: 'flex', gap: '0.2rem' }}>
-                            <button type="button" className="vital-btn" style={{ padding: '0.1rem 0.3rem', fontSize: '0.65rem' }} onClick={() => handleAdjustVitalDirect(c.id, 'mp_current', -1, 'mp_max')}>-1</button>
-                            <button type="button" className="vital-btn" style={{ padding: '0.1rem 0.3rem', fontSize: '0.65rem' }} onClick={() => handleAdjustVitalDirect(c.id, 'mp_current', 1, 'mp_max')}>+1</button>
-                          </div>
-                        </div>
-
-                        {/* SANITY */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>SAN: <strong>{c.san_current}/{c.san_max}</strong></span>
-                          <div style={{ display: 'flex', gap: '0.2rem' }}>
-                            <button type="button" className="vital-btn" style={{ padding: '0.1rem 0.3rem', fontSize: '0.65rem' }} onClick={() => handleAdjustVitalDirect(c.id, 'san_current', -1, 'san_max')}>-1</button>
-                            <button type="button" className="vital-btn" style={{ padding: '0.1rem 0.3rem', fontSize: '0.65rem' }} onClick={() => handleAdjustVitalDirect(c.id, 'san_current', 1, 'san_max')}>+1</button>
-                          </div>
-                        </div>
-
-                      </div>
-
-                      {/* Sheet Edit & Roll quick buttons */}
-                      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.25rem' }}>
-                        <button type="button" className="btn-occult" style={{ flex: 1, padding: '0.35rem', fontSize: '0.75rem', justifyContent: 'center' }} onClick={() => handleOpenEditSheet(c)}>
-                          📝 Editar Ficha
-                        </button>
-                        <button type="button" className="btn-occult-secondary" style={{ padding: '0.35rem', fontSize: '0.75rem' }} onClick={() => triggerDiceRoll(`Percepção de ${c.name}`, c.skills?.find((s: any) => s.name.includes('Spot Hidden'))?.value || 25)} title="Rolar Percepção Ocular">
-                          👁️
-                        </button>
-                      </div>
-
-                    </div>
-                  ))}
-
-                  {(!sessionDetails.characters || sessionDetails.characters.length === 0) && (
-                    <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)', border: '1px dashed var(--border-light)', borderRadius: '8px', fontSize: '0.8rem' }}>
-                      Nenhum investigador conectado.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Middle: Live Room Chat Box */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
-                <h2 style={{ fontFamily: 'var(--font-gothic)', color: 'var(--accent-cyan)', fontSize: '1.2rem' }}>
-                  Chat da Sessão
-                </h2>
-                
-                <div className="chat-panel" style={{ margin: 0, height: '380px', background: 'rgba(10, 10, 15, 0.95)', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column' }}>
-                  <div className="chat-header" style={{ borderBottomColor: 'rgba(255,255,255,0.05)', padding: '0.5rem' }}>
-                    <span className="chat-header-title" style={{ fontSize: '0.8rem' }}>⛧ Sala de Transmissão</span>
-                    <span style={{ fontSize: '0.65rem', color: 'var(--accent-cyan)' }}>Live 3s</span>
-                  </div>
-
-                  <div ref={chatContainerRef} className="chat-messages" style={{ flex: 1, overflowY: 'auto', padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {chatMessages.map((msg) => {
-                      const isMine = msg.sender_id === user.id;
-                      const isWhisper = msg.message_type === 'whisper';
-                      const isRoll = msg.message_type === 'roll';
-                      
-                      let msgClass = 'chat-msg';
-                      if (isMine) msgClass += ' mine';
-                      if (isWhisper) msgClass += ' whisper';
-                      if (isRoll) msgClass += ' roll';
-
-                      return (
-                        <div key={msg.id} className={msgClass}>
-                          <div className="chat-msg-meta">
-                            <span className="chat-msg-sender">
-                              {isWhisper ? (
-                                <>
-                                  💬 sussurro {isMine ? `para ${msg.recipient_username}` : `de ${msg.sender_username}`}
-                                </>
-                              ) : (
-                                msg.sender_username
-                              )}
-                            </span>
-                            <span className="chat-msg-time">
-                              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                          
-                          {isRoll ? (
-                            renderRollDetails(msg.roll_details)
-                          ) : (
-                            <span className="chat-msg-content">{msg.content}</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {chatMessages.length === 0 && (
-                      <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                        Sem rituais falados nesta sala.
-                      </div>
-                    )}
-                  </div>
-
-                  <form onSubmit={handleSendMessage} className="chat-input-area" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '0.5rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <div style={{ display: 'flex', gap: '0.3rem' }}>
-                        <select
-                          className="gothic-select"
-                          value={whisperTarget}
-                          onChange={(e) => setWhisperTarget(e.target.value)}
-                          style={{ fontSize: '0.7rem', padding: '0.2rem 0.4rem', width: '110px', flexShrink: 0, background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border-crimson)', borderRadius: '4px' }}
-                        >
-                          <option value="all">📢 Geral</option>
-                          {sessionDetails.characters?.map((c: any) => (
-                            <option key={c.id} value={c.user_id}>
-                              💬 Sussurro: {c.owner_username}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="text"
-                          className="chat-input-field"
-                          placeholder="Comunicar com a sessão..."
-                          value={chatInput}
-                          onChange={(e) => setChatInput(e.target.value)}
-                          style={{ fontSize: '0.8rem', padding: '0.3rem 0.5rem', flex: 1, background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border-crimson)', color: '#fff', borderRadius: '4px' }}
-                        />
-                      </div>
-                      <button type="submit" className="btn-occult" style={{ width: '100%', padding: '0.35rem', fontSize: '0.75rem', justifyContent: 'center' }}>
-                        Transmitir Ritual ⛧
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-
-              {/* Right: Monospace Gothic log terminal */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
-                <h2 style={{ fontFamily: 'var(--font-gothic)', color: 'var(--accent-gold)', fontSize: '1.2rem' }}>Grimório (Logs)</h2>
-                
-                {/* Quick Dice Roll Buttons Bar */}
-                <div style={{
-                  background: 'rgba(0, 0, 0, 0.3)',
-                  border: '1.5px solid var(--border-light)',
-                  borderRadius: '6px',
-                  padding: '0.6rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                  boxShadow: 'inset 0 0 10px rgba(0,0,0,0.5)'
-                }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-gold)', fontWeight: 'bold', fontFamily: 'var(--font-gothic)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    🎲 Rolar Dado Rápido:
-                  </span>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
-                    {[
-                      { type: 'd100', label: 'D100' },
-                      { type: 'd20', label: 'D20' },
-                      { type: 'd12', label: 'D12' },
-                      { type: 'd10', label: 'D10' },
-                      { type: 'd8', label: 'D8' },
-                      { type: 'd6', label: 'D6' },
-                      { type: 'd4', label: 'D4' },
-                      { type: 'custom', label: 'Custom' }
-                    ].map(die => (
-                      <button
-                        key={die.type}
-                        type="button"
-                        className="vital-btn"
-                        style={{
-                          padding: '0.4rem 0.25rem',
-                          fontSize: '0.75rem',
-                          cursor: 'pointer',
-                          textAlign: 'center',
-                          justifyContent: 'center',
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: '1px solid var(--border-light)',
-                          color: '#fff',
-                          fontWeight: 'bold',
-                          borderRadius: '4px',
-                          display: 'flex',
-                          alignItems: 'center'
-                        }}
-                        onClick={() => triggerDiceRoll(`Rápido ${die.label}`, 0, die.type)}
-                      >
-                        {die.label}
-                      </button>
-                    ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <h2 style={{ fontFamily: 'var(--font-gothic)', color: 'var(--text-crimson)', fontSize: '1.2rem', margin: 0 }}>
+                    Painel de Combate e Viritais
+                  </h2>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      className={`btn-occult-secondary ${sortByDex ? 'active' : ''}`}
+                      onClick={() => setSortByDex(prev => !prev)}
+                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem', border: sortByDex ? '1px solid var(--accent-cyan)' : '1px solid var(--border-light)' }}
+                    >
+                      {sortByDex ? '⚡ DEX: Maior para Menor' : '🔤 Ordem Alfabética'}
+                    </button>
                   </div>
                 </div>
 
-                <div className="gm-log-box" ref={logTerminalRef} style={{
-                  height: '320px',
-                  background: 'rgba(5, 5, 8, 0.95)',
-                  border: '1.5px solid var(--border-gold)',
-                  boxShadow: '0 0 15px rgba(229,169,59,0.05)',
-                  color: '#4af626',
-                  fontFamily: 'monospace',
-                  padding: '0.75rem',
-                  fontSize: '0.75rem',
-                  overflowY: 'auto'
-                }}>
-                  {sessionDetails.logs?.map((l: any) => (
-                    <div key={l.id} style={{ marginBottom: '0.4rem', wordBreak: 'break-word', borderBottom: '1px solid rgba(74, 246, 38, 0.05)', paddingBottom: '0.2rem' }}>
-                      <span style={{ color: '#00d0ff', marginRight: '0.4rem' }}>[{new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]</span>
-                      <span>{l.content}</span>
-                    </div>
-                  ))}
-                  {(!sessionDetails.logs || sessionDetails.logs.length === 0) && (
-                    <div style={{ color: '#666', textAlign: 'center', marginTop: '3rem' }}>* Grimório aguardando rituais *</div>
-                  )}
-                </div>
-
-                {/* Quick log entry console */}
-                <form onSubmit={handlePostLog} style={{ display: 'flex', gap: '0.4rem' }}>
+                {/* Instant NPC Spawner */}
+                <form onSubmit={handleSpawnNpcDirect} className="glass-panel" style={{ display: 'flex', gap: '0.5rem', padding: '0.6rem 1rem', alignItems: 'center' }}>
+                  <span className="gothic-label" style={{ fontSize: '0.75rem', color: 'var(--text-gold)', flexShrink: 0 }}>+ Evocar Monstro/NPC:</span>
                   <input
                     type="text"
                     className="gothic-input"
-                    placeholder="Escriba de evento..."
-                    value={newLogContent}
-                    onChange={(e) => setNewLogContent(e.target.value)}
-                    style={{ fontSize: '0.8rem', padding: '0.4rem' }}
+                    placeholder="Nome da Criatura... (Ex: Ghoul, Cultista)"
+                    value={newNpcName}
+                    onChange={(e) => setNewNpcName(e.target.value)}
+                    style={{ fontSize: '0.8rem', padding: '0.35rem', flex: 1 }}
                   />
-                  <button type="submit" className="btn-occult" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>Escriba</button>
+                  <button type="submit" className="btn-occult" style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem' }}>Spawn ⛧</button>
                 </form>
+
+                {/* PC and NPC List Stacked */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {processedCharacters.map((c: any) => {
+                    const isNpc = c.player === 'NPC' || c.occupation === 'NPC';
+                    const isMyTurn = activeTurnCharId === c.id;
+
+                    const spotHidden = c.skills?.find((s: any) => s.name === 'Spot Hidden' || s.name.includes('Spot Hidden'))?.value || 25;
+                    const listen = c.skills?.find((s: any) => s.name === 'Listen' || s.name.includes('Listen'))?.value || 20;
+
+                    // Progress bar percentages
+                    const hpPercent = Math.max(0, Math.min(100, (c.hp_current / (c.hp_max || 1)) * 100));
+                    const mpPercent = Math.max(0, Math.min(100, (c.mp_current / (c.mp_max || 1)) * 100));
+                    const sanPercent = isNpc ? 0 : Math.max(0, Math.min(100, (c.san_current / (c.san_max || 1)) * 100));
+
+                    return (
+                      <div
+                        key={c.id}
+                        className={`gm-player-card glass-panel ${isMyTurn ? 'glowing-turn' : ''}`}
+                        style={{
+                          padding: '0.85rem',
+                          border: isMyTurn ? '2px solid var(--accent-gold)' : '1px solid var(--border-light)',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.6rem',
+                          position: 'relative',
+                          background: isMyTurn ? 'rgba(229,169,59,0.06)' : 'var(--bg-glass)',
+                          boxShadow: isMyTurn ? '0 0 15px rgba(229,169,59,0.1)' : 'none'
+                        }}
+                      >
+                        {/* Active turn badge */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '0.75rem',
+                            right: '0.75rem',
+                            display: 'flex',
+                            gap: '0.4rem',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="vital-btn"
+                            onClick={() => setActiveTurnCharId(isMyTurn ? null : c.id)}
+                            style={{
+                              padding: '0.2rem 0.5rem',
+                              fontSize: '0.65rem',
+                              background: isMyTurn ? 'var(--accent-gold)' : 'rgba(255,255,255,0.05)',
+                              color: isMyTurn ? '#000' : '#fff',
+                              border: '1px solid var(--border-gold)',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            {isMyTurn ? '⚡ SEU TURNO' : '⚡ Turno'}
+                          </button>
+                        </div>
+
+                        {/* Card Header (Avatar + Name) */}
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                          <span style={{
+                            width: '44px',
+                            height: '44px',
+                            borderRadius: '4px',
+                            border: isNpc ? '1px solid var(--border-crimson)' : '1px solid var(--border-gold)',
+                            background: c.image ? `url(${c.image}) center/cover no-repeat` : 'rgba(0,0,0,0.5)',
+                            display: 'block'
+                          }} />
+                          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                            <span style={{ fontWeight: 'bold', fontSize: '0.95rem', color: isNpc ? 'var(--text-crimson)' : 'var(--text-gold)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              {c.name}
+                              {isNpc && <span style={{ fontSize: '0.6rem', padding: '0.1rem 0.3rem', border: '1px solid var(--border-crimson)', borderRadius: '3px', background: 'rgba(140,12,16,0.1)' }}>Monstro</span>}
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                              {isNpc ? 'Criatura Controlada pelo Mestre' : `Jogador: ${c.owner_username}`}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Vitals Direct inputs and bars grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: isNpc ? '1fr 1fr' : '1fr 1fr 1fr', gap: '0.75rem', background: 'rgba(0,0,0,0.2)', padding: '0.6rem', borderRadius: '6px' }}>
+                          {/* HP Section */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
+                              <span style={{ color: 'var(--text-crimson)', fontWeight: 'bold' }}>Vida (PV)</span>
+                              <span style={{ color: 'var(--text-muted)' }}>{c.hp_current}/{c.hp_max}</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.2rem', alignItems: 'center' }}>
+                              <button type="button" className="vital-btn" onClick={() => handleAdjustVitalDirect(c.id, 'hp_current', -1, 'hp_max')} style={{ padding: '0.15rem 0.35rem', fontSize: '0.7rem' }}>-</button>
+                              <input
+                                type="number"
+                                className="gothic-input"
+                                value={c.hp_current}
+                                onChange={(e) => handleVitalInputChange(c.id, 'hp_current', e.target.value, 'hp_max')}
+                                style={{ width: '100%', padding: '0.2rem', fontSize: '0.8rem', textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)' }}
+                              />
+                              <button type="button" className="vital-btn" onClick={() => handleAdjustVitalDirect(c.id, 'hp_current', 1, 'hp_max')} style={{ padding: '0.15rem 0.35rem', fontSize: '0.7rem' }}>+</button>
+                            </div>
+                            <div style={{ width: '100%', height: '4px', background: 'rgba(0,0,0,0.5)', borderRadius: '2px', overflow: 'hidden' }}>
+                              <div style={{ width: `${hpPercent}%`, height: '100%', background: 'linear-gradient(90deg, #ff3333 0%, #aa0000 100%)', transition: 'width 0.2s ease' }} />
+                            </div>
+                          </div>
+
+                          {/* MP Section */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
+                              <span style={{ color: 'var(--accent-cyan)', fontWeight: 'bold' }}>Magia (PM)</span>
+                              <span style={{ color: 'var(--text-muted)' }}>{c.mp_current}/{c.mp_max}</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.2rem', alignItems: 'center' }}>
+                              <button type="button" className="vital-btn" onClick={() => handleAdjustVitalDirect(c.id, 'mp_current', -1, 'mp_max')} style={{ padding: '0.15rem 0.35rem', fontSize: '0.7rem' }}>-</button>
+                              <input
+                                type="number"
+                                className="gothic-input"
+                                value={c.mp_current}
+                                onChange={(e) => handleVitalInputChange(c.id, 'mp_current', e.target.value, 'mp_max')}
+                                style={{ width: '100%', padding: '0.2rem', fontSize: '0.8rem', textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)' }}
+                              />
+                              <button type="button" className="vital-btn" onClick={() => handleAdjustVitalDirect(c.id, 'mp_current', 1, 'mp_max')} style={{ padding: '0.15rem 0.35rem', fontSize: '0.7rem' }}>+</button>
+                            </div>
+                            <div style={{ width: '100%', height: '4px', background: 'rgba(0,0,0,0.5)', borderRadius: '2px', overflow: 'hidden' }}>
+                              <div style={{ width: `${mpPercent}%`, height: '100%', background: 'linear-gradient(90deg, #00d0ff 0%, #7d00aa 100%)', transition: 'width 0.2s ease' }} />
+                            </div>
+                          </div>
+
+                          {/* Sanity Section (Only for PCs) */}
+                          {!isNpc && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
+                                <span style={{ color: 'var(--text-gold)', fontWeight: 'bold' }}>Sanidade</span>
+                                <span style={{ color: 'var(--text-muted)' }}>{c.san_current}/{c.san_max}</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: '0.2rem', alignItems: 'center' }}>
+                                <button type="button" className="vital-btn" onClick={() => handleAdjustVitalDirect(c.id, 'san_current', -1, 'san_max')} style={{ padding: '0.15rem 0.35rem', fontSize: '0.7rem' }}>-</button>
+                                <input
+                                  type="number"
+                                  className="gothic-input"
+                                  value={c.san_current}
+                                  onChange={(e) => handleVitalInputChange(c.id, 'san_current', e.target.value, 'san_max')}
+                                  style={{ width: '100%', padding: '0.2rem', fontSize: '0.8rem', textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)' }}
+                                />
+                                <button type="button" className="vital-btn" onClick={() => handleAdjustVitalDirect(c.id, 'san_current', 1, 'san_max')} style={{ padding: '0.15rem 0.35rem', fontSize: '0.7rem' }}>+</button>
+                              </div>
+                              <div style={{ width: '100%', height: '4px', background: 'rgba(0,0,0,0.5)', borderRadius: '2px', overflow: 'hidden' }}>
+                                <div style={{ width: `${sanPercent}%`, height: '100%', background: 'linear-gradient(90deg, #e5a93b 0%, #aa1216 100%)', transition: 'width 0.2s ease' }} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Insanity Status pills (Only for PCs) */}
+                        {!isNpc && (
+                          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleInsanity(c.id, 'temporary_insanity')}
+                              style={{
+                                fontSize: '0.65rem',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                border: '1px solid var(--border-crimson)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                background: c.temporary_insanity === 1 ? 'var(--text-crimson)' : 'transparent',
+                                color: c.temporary_insanity === 1 ? '#000' : 'var(--text-crimson)',
+                                fontWeight: 'bold'
+                              }}
+                            >
+                              🌀 Insanidade Temporária
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleInsanity(c.id, 'indefinite_insanity')}
+                              style={{
+                                fontSize: '0.65rem',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                border: '1px solid var(--border-crimson)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                background: c.indefinite_insanity === 1 ? 'var(--text-crimson)' : 'transparent',
+                                color: c.indefinite_insanity === 1 ? '#000' : 'var(--text-crimson)',
+                                fontWeight: 'bold'
+                              }}
+                            >
+                              💀 Insanidade Indefinida
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Core parameters & Quick rollers */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem' }}>
+                          <div style={{ display: 'flex', gap: '0.6rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            <span>DES (DEX): <strong style={{ color: '#fff' }}>{c.dex || 50}</strong></span>
+                            <span>POD (POW): <strong style={{ color: '#fff' }}>{c.pow || 50}</strong></span>
+                            <span>CON: <strong style={{ color: '#fff' }}>{c.con || 50}</strong></span>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '0.3rem' }}>
+                            <button
+                              type="button"
+                              className="vital-btn"
+                              onClick={() => triggerDiceRoll(`👁️ Percepção de ${c.name}`, spotHidden)}
+                              style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem' }}
+                              title={`Rolar Percepção Ocular (${spotHidden}%)`}
+                            >
+                              👁️ Spot {spotHidden}%
+                            </button>
+                            <button
+                              type="button"
+                              className="vital-btn"
+                              onClick={() => triggerDiceRoll(`👂 Escuta de ${c.name}`, listen)}
+                              style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem' }}
+                              title={`Rolar Escuta (${listen}%)`}
+                            >
+                              👂 Listen {listen}%
+                            </button>
+                            <button
+                              type="button"
+                              className="vital-btn"
+                              onClick={() => triggerDiceRoll(`🧠 Teste de PODER (POD) de ${c.name}`, c.pow || 50)}
+                              style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem' }}
+                              title={`Rolar Teste de Poder / Defesa de Sanidade (${c.pow || 50}%)`}
+                            >
+                              🧠 POD {c.pow || 50}%
+                            </button>
+                            <button
+                              type="button"
+                              className="vital-btn"
+                              onClick={() => triggerDiceRoll(`🤸 Teste de DEX (Destreza / Iniciativa) de ${c.name}`, c.dex || 50)}
+                              style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem' }}
+                              title={`Rolar Teste de Destreza (${c.dex || 50}%)`}
+                            >
+                              🤸 DES {c.dex || 50}%
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Action buttons footer */}
+                        <div style={{ display: 'flex', gap: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem' }}>
+                          <button
+                            type="button"
+                            className="btn-occult"
+                            onClick={() => handleOpenEditSheet(c)}
+                            style={{ flex: 1, padding: '0.35rem', fontSize: '0.75rem', justifyContent: 'center' }}
+                          >
+                            📝 Editar Ficha Completa
+                          </button>
+                          {isNpc && (
+                            <button
+                              type="button"
+                              className="btn-occult-secondary"
+                              onClick={() => handleSacrificeNpc(c.id)}
+                              style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem', color: 'var(--text-crimson)' }}
+                              title="Sacrificar NPC / Apagar Ficha"
+                            >
+                              🔥 Sacrificar
+                            </button>
+                          )}
+                        </div>
+
+                      </div>
+                    );
+                  })}
+
+                  {processedCharacters.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)', border: '1px dashed var(--border-light)', borderRadius: '8px', fontSize: '0.85rem' }}>
+                      Nenhum combatente ativo no trono do mestre. Compartilhe o código da campanha com os jogadores!
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Dice Tray, Sticky Notepad & Campaign Logs */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+                
+                {/* Dice Tray */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <h2 style={{ fontFamily: 'var(--font-gothic)', color: 'var(--accent-gold)', fontSize: '1.2rem', margin: 0 }}>
+                    Bandeja de Dados
+                  </h2>
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    border: '1.5px solid var(--border-light)',
+                    borderRadius: '8px',
+                    padding: '0.75rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.6rem',
+                    boxShadow: 'inset 0 0 10px rgba(0,0,0,0.5)'
+                  }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem' }}>
+                      {[
+                        { type: 'd100', label: 'D100' },
+                        { type: 'd20', label: 'D20' },
+                        { type: 'd12', label: 'D12' },
+                        { type: 'd10', label: 'D10' },
+                        { type: 'd8', label: 'D8' },
+                        { type: 'd6', label: 'D6' },
+                        { type: 'd4', label: 'D4' },
+                        { type: 'custom', label: 'Form.' }
+                      ].map(die => (
+                        <button
+                          key={die.type}
+                          type="button"
+                          className="vital-btn"
+                          style={{
+                            padding: '0.5rem 0.25rem',
+                            fontSize: '0.8rem',
+                            textAlign: 'center',
+                            justifyContent: 'center',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid var(--border-light)',
+                            color: '#fff',
+                            fontWeight: 'bold',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                          onClick={() => triggerDiceRoll(`Rolo de GM ${die.label}`, 0, die.type)}
+                        >
+                          {die.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* GMs Sticky Notepad */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <h2 style={{ fontFamily: 'var(--font-gothic)', color: 'var(--accent-cyan)', fontSize: '1.1rem', margin: 0 }}>
+                    Diário Rápido do Mestre (Notepad)
+                  </h2>
+                  <textarea
+                    className="gothic-input"
+                    placeholder="Escreva lembretes rápidos de sessão, pistas, nomes improvisados... (Salva automático)"
+                    value={notesText}
+                    onChange={(e) => handleNotesChange(e.target.value)}
+                    style={{
+                      height: '150px',
+                      fontSize: '0.85rem',
+                      lineHeight: '1.4',
+                      background: 'rgba(5, 5, 8, 0.8)',
+                      color: 'var(--text-primary)',
+                      border: '1.5px solid var(--border-light)',
+                      borderRadius: '6px',
+                      padding: '0.5rem',
+                      resize: 'vertical',
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                </div>
+
+                {/* Grimório (Campaign Logs) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <h2 style={{ fontFamily: 'var(--font-gothic)', color: 'var(--accent-gold)', fontSize: '1.1rem', margin: 0 }}>
+                    Grimório de Eventos (Logs)
+                  </h2>
+                  
+                  <div className="gm-log-box" ref={logTerminalRef} style={{
+                    height: '240px',
+                    background: 'rgba(5, 5, 8, 0.95)',
+                    border: '1.5px solid var(--border-gold)',
+                    boxShadow: 'inset 0 0 15px rgba(0,0,0,0.8)',
+                    color: '#4af626',
+                    fontFamily: 'monospace',
+                    padding: '0.75rem',
+                    fontSize: '0.75rem',
+                    overflowY: 'auto',
+                    borderRadius: '6px'
+                  }}>
+                    {sessionDetails.logs?.map((l: any) => (
+                      <div key={l.id} style={{ marginBottom: '0.4rem', wordBreak: 'break-word', borderBottom: '1px solid rgba(74, 246, 38, 0.05)', paddingBottom: '0.2rem' }}>
+                        <span style={{ color: '#00d0ff', marginRight: '0.4rem' }}>[{new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]</span>
+                        <span>{l.content}</span>
+                      </div>
+                    ))}
+                    {(!sessionDetails.logs || sessionDetails.logs.length === 0) && (
+                      <div style={{ color: '#666', textAlign: 'center', marginTop: '2.5rem' }}>* Grimório aguardando rituais *</div>
+                    )}
+                  </div>
+
+                  {/* Quick log entry console */}
+                  <form onSubmit={handlePostLog} style={{ display: 'flex', gap: '0.4rem' }}>
+                    <input
+                      type="text"
+                      className="gothic-input"
+                      placeholder="Registrar evento místico no grimório..."
+                      value={newLogContent}
+                      onChange={(e) => setNewLogContent(e.target.value)}
+                      style={{ fontSize: '0.8rem', padding: '0.4rem', flex: 1 }}
+                    />
+                    <button type="submit" className="btn-occult" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>Escriba</button>
+                  </form>
+                </div>
+
               </div>
 
             </div>
@@ -1099,6 +1251,15 @@ export default function GmPanel() {
           </div>
         )}
       </main>
+
+      {/* GM Floating Campaign Drawer (Floating Chat & Library Module) */}
+      {gmCharacterMock && (
+        <FloatingCampaignDrawer
+          character={gmCharacterMock}
+          currentUser={user}
+          onRollClick={triggerDiceRoll}
+        />
+      )}
 
       {/* MESTRE MODE FULL-SHEET EDIT MODAL */}
       {isEditOpen && editingChar && (
